@@ -1,0 +1,76 @@
+﻿using System;
+
+using Monaco.Sagas.StateMachine;
+using Rhino.Mocks;
+
+namespace Monaco.Tests.Sandbox.sagas.tests
+{
+	public abstract class SagaStateMachineTestFixure<TSagaStateMachine>
+		where TSagaStateMachine : SagaStateMachine, new()
+	{
+		private readonly MockRepository _mocks;
+		private IServiceBus _serviceBus;
+		private TSagaStateMachine _sagaStateMachine;
+		private SagaUnitTestEventTriggerCondition _eventTriggerConfiguration;
+
+		protected SagaStateMachineTestFixure()
+		{
+			_mocks = new MockRepository();
+		}
+
+		public TSagaStateMachine PrepareStateMachine()
+		{
+			_sagaStateMachine = _mocks.Stub<TSagaStateMachine>();
+
+			_serviceBus = _mocks.DynamicMock<IServiceBus>();
+
+			_sagaStateMachine.Bus = _serviceBus;
+			_sagaStateMachine.Define();
+
+			return _sagaStateMachine;
+		}
+
+		public void Initially(SagaUnitTestEventTriggerCondition condition)
+		{
+			this.ExecuteTest();
+		}
+
+		public void While<TState>(SagaUnitTestEventTriggerCondition condition)
+			where TState : State, new()
+		{
+			_eventTriggerConfiguration.SetSagaStateMachineState(new TState());
+			this.ExecuteTest();
+		}
+
+		private void ExecuteTest()
+		{
+			_eventTriggerConfiguration.ExpectedActions.ForEach(x => x());
+			_mocks.ReplayAll();
+
+			_eventTriggerConfiguration.Actions.ForEach(x =>x());
+			_mocks.VerifyAll();
+
+			//using (_mocks.Record())
+			//{
+			//    _eventTriggerConfiguration.ExpectedActions.ForEach(x => x());
+			//}
+
+			//using (_mocks.Playback())
+			//{
+			//    _eventTriggerConfiguration.Actions.ForEach(x => x());
+			//}
+		}
+
+		public SagaUnitTestEventTriggerCondition When<TMessage>(Func<TMessage> action)
+			where TMessage : IMessage
+		{
+			var message = action();
+
+			_eventTriggerConfiguration = new SagaUnitTestEventTriggerCondition(_sagaStateMachine, _serviceBus,
+			                                                                   () => { var dispatcher = new SagaUnitTestDispatcher(); dispatcher.Dispatch(_sagaStateMachine, message); });
+
+			return _eventTriggerConfiguration;
+		}
+
+	}
+}

@@ -1,0 +1,88 @@
+﻿using System;
+using System.Collections.Generic;
+using Monaco.Bus.MessageManagement.Callbacks;
+using Monaco.Subscriptions;
+using Rhino.Mocks;
+
+namespace Monaco.Testing.MessageConsumers
+{
+	public class MessageConsumerUnitTestExpectation<TMessage> where TMessage : IMessage
+	{
+		private readonly TMessage _message;
+		private readonly IServiceBus _bus;
+		public ICollection<Action> Actions { get; private set; }
+
+		public MessageConsumerUnitTestExpectation(TMessage message, IServiceBus bus)
+		{
+			_message = message;
+			_bus = bus;
+			this.Actions = new List<Action>();
+		}
+
+		public MessageConsumerUnitTestExpectation<TMessage> ExpectToSend<TSendMessage>(Action<TMessage, TSendMessage> action) 
+			where TSendMessage : class, IMessage, new()
+		{
+			var messageToSend = new TSendMessage();
+
+			Action toSend = () =>
+			                	{
+			                		action(_message, messageToSend);
+
+			                		Expect.Call(_bus.Send(messageToSend))
+			                			.Return(new ServiceBusCallback(_bus, null))
+			                			.IgnoreArguments()
+			                			.Repeat.AtLeastOnce()
+			                			.Message(
+			                				"The consumer should send the message " + messageToSend.GetType().Name + 
+			                				" directly to the message owner.");
+			                	};
+
+			this.Actions.Add(toSend);
+			return this;
+		}
+
+		public MessageConsumerUnitTestExpectation<TMessage> ExpectToPublish<TPublishMessage>(Action<TMessage, TPublishMessage> action)
+			where TPublishMessage : class, IMessage, new()
+		{
+			var messageToPublish = new TPublishMessage();
+
+			Action toPublish = () =>
+			                   	{
+			                   		action(_message, messageToPublish);
+
+			                   		Expect.Call(_bus.Publish(messageToPublish))
+			                   			.Return(new List<Subscription>())
+			                   			.IgnoreArguments()
+			                   			.Repeat.AtLeastOnce()
+			                   			.Message(
+			                   				"The consumer should publish the message " + messageToPublish.GetType().Name +
+			                   				" to the indicated endpoints for message processing.");
+			                   	};
+
+			this.Actions.Add(toPublish);
+			return this;
+		}
+
+		public MessageConsumerUnitTestExpectation<TMessage> ExpectReply<TReplyMessage>(Action<TMessage, TReplyMessage> action)
+			where TReplyMessage : class, IMessage, new()
+		{
+			var messageToReply = new TReplyMessage();
+
+			Action toReply = () =>
+			                 	{
+			                 		action(_message, messageToReply);
+
+			                 		Expect.Call(_bus.Reply(messageToReply))
+			                 			.Return(new List<Subscription>())
+			                 			.IgnoreArguments()
+			                 			.Repeat.AtLeastOnce()
+			                 			.Message(
+			                 				"The consumer should create a reply message " + messageToReply.GetType().Name +
+			                 				" to the indicated endpoints for message processing.");
+			                 	};
+
+			this.Actions.Add(toReply);
+			return this;
+		}
+	}
+}

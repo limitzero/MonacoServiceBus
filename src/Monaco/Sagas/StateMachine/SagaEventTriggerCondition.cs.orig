@@ -1,0 +1,291 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
+using Monaco.Bus.Internals.Reflection;
+using Monaco.Bus.Messages.For.Timeouts;
+
+namespace Monaco.Sagas.StateMachine
+{
+	public interface ISagaEventTriggerCondition
+	{
+		/// <summary>
+		/// Gets or sets the state that the saga instance has transitioned into.
+		/// </summary>
+		State State { get; set; }
+
+		/// <summary>
+		/// Gets or sets the current event that triggered the message processing.
+		/// </summary>
+		string Event { get; }
+
+		IMessageActionRecorder Recorder { get; }
+
+		/// <summary>
+		/// Gets the set of message actions that will be taken by the state machine.
+		/// </summary>
+		ICollection<MessageAction> MessageActions { get; }
+	}
+
+	/// <summary>
+	/// Trigger conditions on a saga for the current saga message
+	/// </summary>
+	/// <typeparam name="TSagaMessage">Type of the saga message being processed.</typeparam>
+	public class SagaEventTriggerCondition<TSagaMessage> : ISagaEventTriggerCondition
+		where TSagaMessage : class, ISagaMessage
+	{
+		private readonly bool _isMocked;
+		private readonly SagaStateMachine _sagaStateMachine;
+		private readonly TSagaMessage _currentMessage;
+
+		public IMessageActionRecorder Recorder { get; private set; }
+
+		/// <summary>
+		/// Gets the set of message actions that will be taken by the state machine.
+		/// </summary>
+		public ICollection<MessageAction> MessageActions { get; private set; }
+
+		/// <summary>
+		/// Gets or sets the state that the saga instance has transitioned into.
+		/// </summary>
+		public State State { get; set; }
+
+		public string Event { get; private set; }
+
+		public SagaEventTriggerCondition(SagaStateMachine sagaStateMachine, 
+			TSagaMessage currentMessage, 
+			Action when, 
+			string @event)
+		{
+			_sagaStateMachine = sagaStateMachine;
+			_currentMessage = currentMessage;
+			_isMocked = sagaStateMachine.Bus.GetType().FullName.ToLower().Contains("proxy");
+
+			this.Event = @event;
+			this.MessageActions = new List<MessageAction>();
+			this.CreateSagaAction(SagaMessageActionType.When, currentMessage, when);
+		}
+
+		/// <summary>
+		/// This will signal the state machine to check the current message for correlation 
+		/// to the instance data to see if this message can be accepted onto the saga for 
+		/// processing.
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <param name="correlate"></param>
+		/// <returns></returns>
+		public SagaEventTriggerCondition<TSagaMessage> CorrelatedBy<TMessage>(Func<TMessage, ISagaData, bool> correlate)
+			where TMessage : ISagaMessage
+		{
+			//Func<bool> result = () => correlate(this._currentMessage);
+			//this.CreateSagaAction<TSagaMessage>(SagaMessageActionType.Correlate, _currentMessage, correlate);
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the saga state machine can execute some custom code after a message 
+		/// is received.
+		/// </summary>
+		/// <param name="action">Custom code to execute</param>
+		/// <returns></returns>
+		public SagaEventTriggerCondition<TSagaMessage> Do(Action<TSagaMessage> action)
+		{
+			var recorder = new MessageActionRecorder();
+			recorder.RecordDoAction(action);
+
+			//this.CreateSagaAction(SagaMessageActionType.Do, _currentMessage, action);
+
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the saga instance will publish a message to one or more message consumers.
+		/// </summary>
+		/// <typeparam name="TMessage">Concrete type of the message to publish</typeparam>
+		/// <param name="publish">Function to create the message to publish</param>
+		/// <returns></returns>
+		public SagaEventTriggerCondition<TSagaMessage> Publish<TMessage>(Action<TSagaMessage, TMessage> publish)
+			where TMessage : class, IMessage
+		{
+			var message = this.CreateMessage<TMessage>();
+
+			if(!_isMocked)
+				publish(_currentMessage, message);
+
+			var recorder = new MessageActionRecorder();
+			recorder.RecordPublishAction(publish, message);
+
+			//this.CreateSagaAction(SagaMessageActionType.Publish, message,
+			//              () => this._sagaStateMachine.Bus.Publish(message));
+
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the saga instance will send a message to a consumer on the local bus 
+		/// instance.
+		/// </summary>
+		/// <typeparam name="TMessage">Concrete type of the message to send</typeparam>
+		/// <param name="send">Function to create the message to send</param>
+		/// <returns></returns>
+		public SagaEventTriggerCondition<TSagaMessage> Send<TMessage>(Action<TSagaMessage, TMessage> send)
+			where TMessage : IMessage
+		{
+			var message = this.CreateMessage<TMessage>();
+
+			if(!_isMocked)
+				send(this._currentMessage, message);
+
+			this.CreateSagaAction(SagaMessageActionType.Send, message,
+								  () => this._sagaStateMachine.Bus.Send(message));
+
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the saga instance will send a message to a consumer on the local bus 
+		/// instance.
+		/// </summary>
+		/// <typeparam name="TMessage">Concrete type of the message to send</typeparam>
+		/// <param name="endpoint">The uri semantic for a location that will process the message</param>
+		/// <param name="send">Function to create the message to send</param>
+		/// <returns></returns>
+		public SagaEventTriggerCondition<TSagaMessage> SendToEndpoint<TMessage>(Uri endpoint,
+																  Action<TSagaMessage, TMessage> send)
+			where TMessage : IMessage
+		{
+			var message = this.CreateMessage<TMessage>();
+
+			if(!_isMocked)
+				 send(this._currentMessage, message);
+
+			var messageAction = new MessageAction(SagaMessageActionType.SendToEndpoint,
+												  message, () => this._sagaStateMachine.Bus.Send(endpoint, message), _isMocked);
+			messageAction.Endpoint = endpoint.OriginalString;
+
+			this.MessageActions.Add(messageAction);
+
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the saga instance will send a reply for the current message being 
+		/// processed.
+		/// </summary>
+		/// <typeparam name="TMessage">Type of the message representing the reply</typeparam>
+		/// <param name="reply">Function to return the new reply message</param>
+		/// <returns></returns>
+        public SagaEventTriggerCondition<TSagaMessage> Reply<TMessage>(Action<TSagaMessage, TMessage> reply)
+			where TMessage : IMessage
+		{
+			var message = this.CreateMessage<TMessage>();
+
+			if(!_isMocked)
+				reply(this._currentMessage,  message);
+
+			this.CreateSagaAction(SagaMessageActionType.Reply, message,
+								  () => this._sagaStateMachine.Bus.Reply(message));
+
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that a message will be delayed for publication after a given interval.
+		/// </summary>
+		/// <typeparam name="TMessage">Concrete message to schedule for delayed delivery</typeparam>
+		/// <param name="duration">Time to wait before delivery</param>
+		/// <param name="delay">Function to create the message for delivery</param>
+		/// <returns></returns>
+		public SagaEventTriggerCondition<TSagaMessage> Delay<TMessage>(TimeSpan duration, Action<TSagaMessage, TMessage> delay)
+			where TMessage : IMessage
+		{
+			var message = this.CreateMessage<TMessage>();
+
+			if(!_isMocked)
+			   delay(_currentMessage,   message);
+
+			var timeout = new ScheduleTimeout(duration, message as IMessage);
+
+			var action = new MessageAction(SagaMessageActionType.Delay, message,
+										   () => this._sagaStateMachine.Bus.Send(timeout), _isMocked);
+			action.Delay = duration;
+
+			this.MessageActions.Add(action);
+
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal for the current saga to complete its processing.
+		/// </summary>
+		/// <returns></returns>
+		public SagaEventTriggerCondition<TSagaMessage> Complete()
+		{
+			this.State = new State("End");
+			this.CreateSagaAction(SagaMessageActionType.Complete, null,
+				() => _sagaStateMachine.MarkAsCompleted(), this.State);
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the current saga will transition to a pre-defined state and wait
+		/// for a new event to be triggered for re-starting the processing
+		/// </summary>
+		/// <param name="state">The concrete state to set on the saga</param>
+		/// <returns></returns>
+		public SagaEventTriggerCondition<TSagaMessage> TransitionTo(State state)
+		{
+			this.State = state;
+			this.CreateSagaAction(SagaMessageActionType.Transition, null,
+				() => { this._sagaStateMachine.CurrentState = this.State; }, this.State);
+			return this;
+		}
+
+		private TMessage CreateMessage<TMessage>()
+		{
+			var message = default(TMessage);
+
+			if(typeof(TMessage).IsInterface)
+			{
+				if(!_isMocked)
+				{
+					message = _sagaStateMachine.Bus.CreateMessage<TMessage>();
+				}
+				else
+				{
+					message = DefaultReflection.CreateMessage<TMessage>();	
+				}
+			}
+			else
+			{
+				if (!_isMocked)
+				{
+					message = _sagaStateMachine.Bus.Find<TMessage>();
+				}
+				else
+				{
+					message = (TMessage)typeof(TMessage).Assembly.CreateInstance(typeof(TMessage).FullName);	
+				}	
+			}
+
+			return message;
+		}
+
+		private void CreateSagaAction(SagaMessageActionType sagaActionType,
+									  object message, Action<object> action, State state = null)
+		{
+			var messageAction = new MessageAction(sagaActionType, message, action, _isMocked);
+			messageAction.State = state;
+			this.MessageActions.Add(messageAction);
+		}
+
+		private void CreateSagaAction<TMessage>(SagaMessageActionType sagaActionType,
+			TMessage message,
+			Func<TMessage, bool> action, 
+			State state = null) where TMessage : ISagaMessage
+		{
+			var messageAction = new CorrelateMessageAction<TMessage>(sagaActionType, message, action, _isMocked);
+			messageAction.State = state;
+			this.MessageActions.Add(messageAction);
+		}
+	}
+}

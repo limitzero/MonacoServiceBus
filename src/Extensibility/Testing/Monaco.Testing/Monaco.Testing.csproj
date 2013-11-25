@@ -1,0 +1,118 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{02595A00-246B-4CDB-8870-0D5AC08C1B85}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Monaco.Testing</RootNamespace>
+    <AssemblyName>Monaco.Testing</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Castle.Core">
+      <HintPath>..\..\..\..\lib\Castle.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.DynamicProxy2">
+      <HintPath>..\..\..\..\lib\Castle.DynamicProxy2.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.MicroKernel">
+      <HintPath>..\..\..\..\lib\Castle.MicroKernel.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="ConfigurationExtensions.cs" />
+    <Compile Include="Internals\Exceptions\PublishInvocationException.cs" />
+    <Compile Include="Internals\Exceptions\ReplyInvocationException.cs" />
+    <Compile Include="Internals\Exceptions\SendInvocationException.cs" />
+    <Compile Include="Internals\Exceptions\StateMachineCompletionInvocationException.cs" />
+    <Compile Include="Internals\Exceptions\StateMachineDataExpectationException.cs" />
+    <Compile Include="Internals\Exceptions\StateMachineNonCompletionInvocationException.cs" />
+    <Compile Include="Internals\Exceptions\StateMachineStateNonTransitionInvocationException.cs" />
+    <Compile Include="Internals\Exceptions\StateMachineStateTransitionInvocationException.cs" />
+    <Compile Include="Internals\Exceptions\TimeoutInvocationException.cs" />
+    <Compile Include="Internals\Interceptors\IInterfacePersistance.cs" />
+    <Compile Include="Internals\Interceptors\Impl\InterfaceInterceptor.cs" />
+    <Compile Include="Internals\Interceptors\Impl\InterfacePersistance.cs" />
+    <Compile Include="Internals\Interceptors\Impl\ServiceBusInvocationInterceptor.cs" />
+    <Compile Include="Internals\Invocations\BaseInvocation.cs" />
+    <Compile Include="Internals\Invocations\Impl\DelayInvocation.cs" />
+    <Compile Include="Internals\Invocations\Impl\PublishInvocation.cs" />
+    <Compile Include="Internals\Invocations\Impl\ReplyInvocation.cs" />
+    <Compile Include="Internals\Invocations\Impl\SendInvocation.cs" />
+    <Compile Include="Internals\Invocations\IStateMachineInvocation.cs" />
+    <Compile Include="Internals\Invocations\MockServiceBus.cs" />
+    <Compile Include="Internals\Specifications\Impl\ServiceBusVerificationSpecification.cs" />
+    <Compile Include="Internals\Specifications\IPublishVerificationSpecification.cs" />
+    <Compile Include="Internals\Specifications\IReplyVerificationSpecification.cs" />
+    <Compile Include="Internals\Specifications\ISendVerificationSpecification.cs" />
+    <Compile Include="Internals\Specifications\IServiceBusVerificationSpecification.cs" />
+    <Compile Include="Internals\Specifications\ITimeoutVerificationSpecification.cs" />
+    <Compile Include="MessageConsumers\IMessageConsumerTestScenario.cs" />
+    <Compile Include="MessageConsumers\Impl\MessageConsumerTestScenario.cs" />
+    <Compile Include="MessageConsumers\MessageConsumerTestContext.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StateMachines\Impl\StateMachineTestScenario.cs" />
+    <Compile Include="StateMachines\Internals\Actions\BaseTestExpectationAction.cs" />
+    <Compile Include="StateMachines\Internals\Actions\Impl\ExpectNotToDelayAction.cs" />
+    <Compile Include="StateMachines\Internals\Actions\Impl\ExpectNotToPublishAction.cs" />
+    <Compile Include="StateMachines\Internals\Actions\Impl\ExpectNotToReplyAction.cs" />
+    <Compile Include="StateMachines\Internals\Actions\Impl\ExpectNotToSendAction.cs" />
+    <Compile Include="StateMachines\Internals\Actions\Impl\ExpectToPublishAction.cs" />
+    <Compile Include="StateMachines\Internals\Actions\Impl\ExpectToReplyAction.cs" />
+    <Compile Include="StateMachines\Internals\Actions\Impl\ExpectToRequestTimeoutAction.cs" />
+    <Compile Include="StateMachines\Internals\Actions\Impl\ExpectToSendAction.cs" />
+    <Compile Include="StateMachines\Internals\MockFactory.cs" />
+    <Compile Include="StateMachines\IStateMachineTestCondition.cs" />
+    <Compile Include="StateMachines\IStateMachineTestScenario.cs" />
+    <Compile Include="StateMachines\StateMachineTestContext.cs" />
+    <Compile Include="Verbalizer\Impl\SagaStateMachineVerbalizer.cs" />
+    <Compile Include="Verbalizer\ISagaStateMachineVerbalizer.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Monaco\Monaco.csproj">
+      <Project>{2CAD4D0B-EB3D-4575-9809-3EB0BB0E23AC}</Project>
+      <Name>Monaco</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Containers\Monaco.Containers.Windsor\Monaco.Containers.Windsor.csproj">
+      <Project>{D6D40AB7-F120-443B-A4F6-0EFB505BDB5C}</Project>
+      <Name>Monaco.Containers.Windsor</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

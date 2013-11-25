@@ -1,0 +1,429 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{2CAD4D0B-EB3D-4575-9809-3EB0BB0E23AC}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Monaco</RootNamespace>
+    <AssemblyName>Monaco</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Castle.Core, Version=1.2.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\Castle.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.DynamicProxy2, Version=2.2.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\Castle.DynamicProxy2.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.MicroKernel, Version=2.1.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\Castle.MicroKernel.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.Windsor, Version=2.1.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\Castle.Windsor.dll</HintPath>
+    </Reference>
+    <Reference Include="log4net, Version=1.2.10.0, Culture=neutral, PublicKeyToken=1b44e1d426115821, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\log4net.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Moq, Version=3.0.308.2, Culture=neutral, PublicKeyToken=69f491c39445e920, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\Moq.dll</HintPath>
+    </Reference>
+    <Reference Include="Polenter.SharpSerializer, Version=2.6.0.0, Culture=neutral, PublicKeyToken=8f4f20011571ee5f, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\lib\Polenter.SharpSerializer.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Messaging" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Transactions" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Bus\Services\Subscriptions\Messages\Commands\RefreshLocalSubscriptions.cs" />
+    <Compile Include="Configuration\ConfigurationExtensions.cs" />
+    <Compile Include="Configuration\Configuration.cs" />
+    <Compile Include="Configuration\ContainerLifeCycle.cs" />
+    <Compile Include="Configuration\Impl\EndpointConfiguration.cs" />
+    <Compile Include="Configuration\ICanConfigureEndpoint.cs" />
+    <Compile Include="Configuration\IConfiguration.cs" />
+    <Compile Include="Configuration\IContainer.cs" />
+    <Compile Include="Configuration\IContainerConfiguration.cs" />
+    <Compile Include="Configuration\IEndpointConfiguration.cs" />
+    <Compile Include="Configuration\Impl\ContainerConfiguration.cs" />
+    <Compile Include="Configuration\Impl\MessagesConfiguration.cs" />
+    <Compile Include="Configuration\Impl\StorageConfiguration.cs" />
+    <Compile Include="Configuration\Impl\TransportConfiguration.cs" />
+    <Compile Include="Configuration\IStorageConfiguration.cs" />
+    <Compile Include="Configuration\ITransportConfiguration.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Bus\Agents\Scheduler\EventArgs\ScheduledItemErrorEventArgs.cs" />
+    <Compile Include="Bus\Agents\Scheduler\EventArgs\ScheduledItemMessageCreatedEventArgs.cs" />
+    <Compile Include="Bus\Agents\Scheduler\EventArgs\ScheduledTaskMessageCreatedEventArgs.cs" />
+    <Compile Include="Bus\Agents\Scheduler\IScheduledItem.cs" />
+    <Compile Include="Bus\Agents\Scheduler\IScheduledTask.cs" />
+    <Compile Include="Bus\Agents\Scheduler\IScheduler.cs" />
+    <Compile Include="Bus\Agents\Scheduler\ScheduleItem.cs" />
+    <Compile Include="Bus\Agents\Scheduler\Scheduler.cs" />
+    <Compile Include="Bus\Agents\Scheduler\Tasks\Configuration\Impl\TaskConfiguration.cs" />
+    <Compile Include="Bus\Agents\Scheduler\Tasks\Configuration\ITaskConfiguration.cs" />
+    <Compile Include="Bus\Agents\Scheduler\Tasks\MethodInvoker\IMethodInvokerScheduledTask.cs" />
+    <Compile Include="Bus\Agents\Scheduler\Tasks\MethodInvoker\MethodInvokerScheduledTask.cs" />
+    <Compile Include="Bus\Constants.cs" />
+    <Compile Include="Bus\ControlBus.cs" />
+    <Compile Include="Bus\MessageManagement\Pipeline\Impl\Filters\MessageLogging\LogMessageFilter.cs" />
+    <Compile Include="Extensibility\Transports\BaseTransportBootstrapper.cs" />
+    <Compile Include="WireEncrytedString.cs" />
+    <None Include="Bus\DefaultServiceBus.cs.good" />
+    <Compile Include="Bus\CurrentMessageInformation.cs" />
+    <Compile Include="Bus\Envelope.cs" />
+    <Compile Include="Bus\Internals\Reflection\Internals\IInterfacePersistance.cs" />
+    <Compile Include="Bus\Internals\Reflection\Internals\Impl\InterfaceInterceptor.cs" />
+    <Compile Include="Bus\Internals\Reflection\Internals\Impl\InterfacePersistance.cs" />
+    <Compile Include="Bus\Internals\Threading\WaitQueue.cs" />
+    <Compile Include="Bus\MessageManagement\Dispatcher\IMessageDispatcher.cs" />
+    <Compile Include="Bus\MessageManagement\Dispatcher\Impl\MessageDispatcher.cs" />
+    <Compile Include="Bus\MessageManagement\Dispatcher\Internal\Consumers\Impl\SimpleConsumerMessageDispatcher.cs" />
+    <Compile Include="Bus\MessageManagement\Dispatcher\Internal\Consumers\ISimpleConsumerMessageDispatcher.cs" />
+    <Compile Include="Bus\MessageManagement\Dispatcher\Internal\IDispatcher.cs" />
+    <Compile Include="Bus\MessageManagement\Dispatcher\Internal\MessageMethodInvoker.cs" />
+    <Compile Include="Bus\MessageManagement\Dispatcher\Internal\MessageToMethodMapper.cs" />
+    <Compile Include="Bus\MessageManagement\Dispatcher\Internal\StateMachines\Impl\SagaStateMachineMessageDispatcher.cs" />
+    <Compile Include="Bus\MessageManagement\Dispatcher\Internal\StateMachines\ISagaStateMachineMessageDispatcher.cs" />
+    <Compile Include="Bus\MessageManagement\FaultHandling\Impl\RecoveryMessageConsumer.cs" />
+    <Compile Include="Bus\MessageManagement\Pipeline\BasePipeline.cs" />
+    <Compile Include="Bus\MessageManagement\Pipeline\Impl\DefaultPipeline.cs" />
+    <Compile Include="Bus\MessageManagement\Pipeline\Impl\Filters\MesssageModules\EndMessageModulesFilter.cs" />
+    <Compile Include="Bus\MessageManagement\Pipeline\Impl\Filters\MesssageModules\StartMessageModulesFilter.cs" />
+    <Compile Include="Bus\MessageManagement\Pipeline\IPipeline.cs" />
+    <Compile Include="Bus\MessageManagement\Pipeline\IPipelineFilter.cs" />
+    <Compile Include="Bus\MessageManagement\Pipeline\PipelineDirection.cs" />
+    <Compile Include="Bus\MessageManagement\Resolving\IResolveMessageToConsumers.cs" />
+    <Compile Include="Bus\MessageManagement\Resolving\Impl\ResolveMessageToConsumers.cs" />
+    <Compile Include="Bus\MessageManagement\Serialization\Impl\SharpSerializerInterfaceProxyDeserializerSupport.cs" />
+    <Compile Include="Configuration\Profiles\ILiteProfile.cs" />
+    <Compile Include="Configuration\Registration\IRegisterConsumer.cs" />
+    <Compile Include="Configuration\Registration\Impl\RegisterConsumer.cs" />
+    <Compile Include="Endpoint\BaseEndpoint.cs" />
+    <Compile Include="Endpoint\Factory\EndpointFactory.cs" />
+    <Compile Include="Endpoint\Factory\Exchange.cs" />
+    <Compile Include="Endpoint\Factory\IEndpointFactory.cs" />
+    <Compile Include="Endpoint\IEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Bus\BusEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Bus\IBusEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Bus\IServiceBusErrorEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Bus\ServiceBusEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Bus\IServiceBusEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Bus\IServiceBusLogEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Bus\IStandaloneEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Bus\ServiceBusErrorEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Bus\ServiceBusLogEndpoint.cs" />
+    <Compile Include="Endpoint\Registrations\IEndpointTransportRegistration.cs" />
+    <Compile Include="Extensibility\Storage\StateMachines\BaseStateMachineDataRepository.cs" />
+    <Compile Include="Extensibility\Storage\StateMachines\IStateMachineDataFinder.cs" />
+    <Compile Include="Extensibility\Storage\StateMachines\IStateMachineDataMerger.cs" />
+    <Compile Include="Extensibility\Storage\StateMachines\IStateMachineDataRepository.cs" />
+    <Compile Include="Extensibility\Storage\Subscriptions\ISubscriptionRepository.cs" />
+    <Compile Include="Extensibility\Storage\Timeouts\ITimeoutsRepository.cs" />
+    <Compile Include="Extensions\ObjectExtensions.cs" />
+    <Compile Include="IControlBus.cs" />
+    <Compile Include="Bus\Roles\ICanConsumeMessages.cs" />
+    <Compile Include="Bus\Roles\ICanEnlistInstanceConsumers.cs" />
+    <Compile Include="Bus\Roles\ICanEnqueueRequests.cs" />
+    <Compile Include="Bus\Roles\ICanFindComponents.cs" />
+    <Compile Include="Bus\Roles\ICanHandleMessageLater.cs" />
+    <Compile Include="Bus\Roles\ICanInitializeBusWithEndpointConfiguration.cs" />
+    <Compile Include="Bus\Roles\ICanPublishMessage.cs" />
+    <Compile Include="Bus\IEnvelope.cs" />
+    <Compile Include="Bus\DefaultServiceBus.cs" />
+    <None Include="Transport\Virtual\VirtualTransport.cs.orig" />
+    <Compile Include="StateMachine\Event.cs" />
+    <Compile Include="StateMachine\Internals\IMessageActionRecorder.cs" />
+    <Compile Include="StateMachine\Internals\Impl\End.cs" />
+    <Compile Include="StateMachine\Internals\Impl\Start.cs" />
+    <Compile Include="StateMachine\Internals\ISagaEventTriggerCondition.cs" />
+    <Compile Include="StateMachine\Internals\Impl\MessageAction.cs" />
+    <Compile Include="StateMachine\Internals\Impl\MessageActionRecorder.cs" />
+    <Compile Include="StateMachine\Internals\Impl\SagaStateMachineMessageActionType.cs" />
+    <Compile Include="StateMachine\Internals\Impl\SagaEventTriggerCondition.cs" />
+    <Compile Include="StateMachine\Internals\Impl\SagaStateMachineStageType.cs" />
+    <Compile Include="StateMachine\Internals\Impl\SagaStateMachineDefinedTriggerCondition.cs" />
+    <Compile Include="StateMachine\Internals\Impl\StateMachineDataToMessageDataCorrelation.cs" />
+    <Compile Include="StateMachine\IStateMachineData.cs" />
+    <Compile Include="StateMachine\Persistance\BaseStateMachineDataRepository.cs" />
+    <Compile Include="StateMachine\Persistance\IStateMachineDataFinder.cs" />
+    <Compile Include="StateMachine\Persistance\IStateMachineDataMerger.cs" />
+    <Compile Include="StateMachine\Roles\IStateMachine.cs" />
+    <Compile Include="StateMachine\State.cs" />
+    <Compile Include="StateMachine\SagaStateMachine.cs" />
+    <Compile Include="StateMachine\Verbalizer\ISagaStateMachineVerbalizer.cs" />
+    <Compile Include="StateMachine\Verbalizer\Impl\SagaStateMachineVerbalizer.cs" />
+    <Compile Include="Extensibility\Storage\Impl\Volatile\InMemoryStateMachineDataRepository.cs" />
+    <Compile Include="Extensibility\Storage\Impl\Volatile\InMemorySubscriptionRepository.cs" />
+    <Compile Include="Extensibility\Storage\Impl\Volatile\InMemoryTimeoutsRepository.cs" />
+    <Compile Include="Transport\Virtual\VirtualTransportStorage.cs" />
+    <Compile Include="Bus\Messages\For\Logging\EndpointLogMessage.cs" />
+    <Compile Include="Extensibility\Logging\Impl\NullLogger.cs" />
+    <Compile Include="IOneWayBus.cs" />
+    <Compile Include="Bus\OneWayBus.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Commands\Ping.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Commands\Pong.cs" />
+    <Compile Include="Bus\Consumers\RequestReplyStateMachineData.cs" />
+    <Compile Include="Bus\Messages\For\Faults\NoSubscriptionForMessageFaultMessage.cs" />
+    <Compile Include="Bus\MessageManagement\FaultHandling\Impl\NoSubscriptionForPublishedMessageConsumer.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Commands\BringEndpointBackOnline.cs" />
+    <Compile Include="Bus\Messages\For\Control\DeliverMessage.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointReadyForWork.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointStarted.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointStopped.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Commands\PrepareEndpointStatus.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointStatusPrepared.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointTakenOffline.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Commands\TakeEndpointOffline.cs" />
+    <Compile Include="Bus\Services\Subscriptions\Messages\Events\SubscriptionsRemoved.cs" />
+    <Compile Include="Bus\Services\Timeout\Messages\Events\TimeoutCancelled.cs" />
+    <Compile Include="Bus\Services\Timeout\Messages\Events\TimeoutRequested.cs" />
+    <Compile Include="Bus\Messages\For\Endpoints\BroadcastStatusForAllEndpointsMessage.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Commands\RecycleStatisticsMessage.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointHeartBeat.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\EndpointMetricStatus.cs" />
+    <Compile Include="Bus\Messages\For\Endpoints\EndpointsStatusInquiryMessage.cs" />
+    <Compile Include="Bus\Messages\For\Endpoints\EndpointStatusInquiryMessage.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\EndpointStatusResultMessage.cs" />
+    <Compile Include="Bus\Messages\For\Recovery\RecoveryMessage.cs" />
+    <Compile Include="Bus\Messages\For\Sagas\SuspendSagaMessage.cs" />
+    <Compile Include="Bus\Messages\For\Subscriptions\AvailableSubscriptionsMessage.cs" />
+    <Compile Include="Bus\Messages\IAdminMessage.cs" />
+    <Compile Include="Bus\Persistance\Callbacks\LocalCallBackRepository.cs" />
+    <Compile Include="Bus\Roles\ICanReplyToMessages.cs" />
+    <Compile Include="Bus\Roles\ICanSendMessages.cs" />
+    <Compile Include="Bus\Roles\ICanSubscribeToMessages.cs" />
+    <Compile Include="Bus\Roles\IObjectFactory.cs" />
+    <Compile Include="IServiceBus.cs" />
+    <Compile Include="IUnicastBus.cs" />
+    <Compile Include="Endpoint\AbstractRemoteEndpoint.cs" />
+    <Compile Include="Endpoint\IRemoteEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Log\LogEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Log\ILogEndpoint.cs" />
+    <Compile Include="Extensions\ArrayExtentions.cs" />
+    <Compile Include="Extensibility\Logging\Impl\ConsoleLogger.cs" />
+    <Compile Include="Extensibility\Logging\ILogger.cs" />
+    <Compile Include="Extensibility\Logging\Impl\Log4NetLogger.cs" />
+    <Compile Include="MessageConsumer.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\HealthMonitoringService.cs" />
+    <Compile Include="Bus\Services\Subscriptions\Messages\Commands\PrepareSubscriptions.cs" />
+    <Compile Include="Bus\Services\Subscriptions\Messages\Events\SubscriptionsPrepared.cs" />
+    <Compile Include="Bus\Services\Subscriptions\Tasks\PrepareSubscriptionsTask.cs" />
+    <Compile Include="Bus\Services\Timeout\TimeoutsService.cs" />
+    <Compile Include="Bus\Services\Timeout\TimeoutsConsumer.cs" />
+    <Compile Include="Bus\Services\Timeout\ITimeoutsService.cs" />
+    <Compile Include="Bus\Repositories\IHandlerConfigurationRepository.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointBackOnline.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointSagaResumed.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointSagaSuspended.cs" />
+    <Compile Include="Bus\Events\EndpointStarted.cs" />
+    <Compile Include="Bus\Events\EndpointStopped.cs" />
+    <Compile Include="Bus\Entities\IMonacoEntity.cs" />
+    <Compile Include="Bus\Entities\SagaDataInstance.cs" />
+    <Compile Include="Bus\Entities\SagaInstance.cs" />
+    <Compile Include="Bus\Entities\Timeout.cs" />
+    <Compile Include="Bus\Internals\IConsumer.cs" />
+    <Compile Include="Bus\Internals\IMessageReceiver.cs" />
+    <Compile Include="Bus\Internals\IMessageStore.cs" />
+    <Compile Include="Bus\Internals\IProducer.cs" />
+    <Compile Include="Bus\Internals\IStartable.cs" />
+    <Compile Include="Bus\Internals\Threading\AsyncResult.cs" />
+    <Compile Include="Bus\MessageManagement\Callbacks\CorrelatedCallbackDataStructure.cs" />
+    <Compile Include="Bus\MessageManagement\Callbacks\ICallback.cs" />
+    <Compile Include="Bus\MessageManagement\FaultHandling\FaultHandlerConfiguration.cs" />
+    <Compile Include="Bus\Persistance\FaultHandlers\FaultHandlerConfigurationRepository.cs" />
+    <Compile Include="Bus\MessageManagement\FaultHandling\FaultMessage.cs" />
+    <Compile Include="Bus\MessageManagement\FaultHandling\FaultProcessor.cs" />
+    <Compile Include="Bus\MessageManagement\FaultHandling\FaultConsumer.cs" />
+    <Compile Include="Bus\MessageManagement\Serialization\Impl\DataContractSerializationProvider.cs" />
+    <Compile Include="Bus\MessageManagement\Serialization\ISerializationProvider.cs" />
+    <Compile Include="Bus\MessageManagement\Serialization\Impl\SharpSerializationProvider.cs" />
+    <Compile Include="Bus\Messages\For\Publications\PublishMessage.cs" />
+    <Compile Include="Bus\Messages\For\Subscriptions\EndpointSubscriptionsMessage.cs" />
+    <Compile Include="Bus\Messages\For\Subscriptions\RegisterSubscriptionMessage.cs" />
+    <Compile Include="Bus\Messages\For\Subscriptions\UnregisterSubscriptionMessage.cs" />
+    <Compile Include="Bus\Services\Timeout\Messages\Commands\CancelTimeout.cs" />
+    <Compile Include="Bus\Services\Timeout\Messages\Commands\ScheduleTimeout.cs" />
+    <Compile Include="Bus\Services\Timeout\Messages\Events\TimeoutExpired.cs" />
+    <Compile Include="Bus\Repositories\IFaultHandlerConfigurationRepository.cs" />
+    <Compile Include="Bus\MessageManagement\FaultHandling\IFaultMessage.cs" />
+    <Compile Include="Bus\MessageManagement\FaultHandling\IFaultProcessor.cs" />
+    <Compile Include="Bus\MessageManagement\FaultHandling\Impl\NoConsumerForMessageFaultHandler.cs" />
+    <Compile Include="Bus\Messages\For\Faults\NoConsumerForMessageFaultMessage.cs" />
+    <Compile Include="Bus\Repositories\ICallBackRepository.cs" />
+    <Compile Include="Bus\MessageManagement\Callbacks\ServiceBusCallback.cs" />
+    <None Include="Endpoint\Management\Health\EndpointHealthMessageConsumer.cs.orig" />
+    <Compile Include="Bus\Services\HealthMonitoring\HealthMonitoringData.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\HealthMonitoringStatistic.cs" />
+    <None Include="Endpoint\Management\Maintenance\EndpointMaintenanceService.cs.orig" />
+    <Compile Include="Configuration\Endpoint\BaseEndpointConfiguration.cs" />
+    <Compile Include="Configuration\Bootstrapper\Impl\LocalDataStorageBootstrapper.cs" />
+    <Compile Include="Configuration\Elements\StorageElementBuilder.cs" />
+    <Compile Include="Configuration\Registration\HandlerConfiguration.cs" />
+    <Compile Include="Configuration\Profiles\Options\ICanPollForTasks.cs" />
+    <Compile Include="Configuration\Profiles\Options\ICanPollForTimeouts.cs" />
+    <Compile Include="Configuration\Profiles\IConsoleProfile.cs" />
+    <Compile Include="Configuration\Profiles\IProfile.cs" />
+    <Compile Include="Configuration\Profiles\Options\ICanPublishMessages.cs" />
+    <Compile Include="CorrelatedBy.cs" />
+    <Compile Include="Endpoint\Impl\Control\ControlEndpoint.cs" />
+    <Compile Include="Endpoint\Impl\Control\IControlEndpoint.cs" />
+    <Compile Include="CombGuid.cs" />
+    <Compile Include="Extensions\StringExtensions.cs" />
+    <Compile Include="Extensions\TimeExtensions.cs" />
+    <Compile Include="Hosting\DefaultHost.cs" />
+    <Compile Include="Hosting\HostConfiguration.cs" />
+    <Compile Include="Hosting\HostedService.cs" />
+    <Compile Include="Hosting\IApplicationHost.cs" />
+    <Compile Include="Hosting\RemoteAppDomainHost.cs" />
+    <Compile Include="Hosting\RemoteAppDomainHostConfiguration.cs" />
+    <Compile Include="Hosting\RemoteDomainHost.cs" />
+    <Compile Include="IServiceAsyncRequest.cs" />
+    <Compile Include="IBusModule.cs" />
+    <Compile Include="IMessageModule.cs" />
+    <Compile Include="Bus\Internals\Disposable\BaseDisposable.cs" />
+    <Compile Include="Bus\Persistance\Handlers\LocalHandlerConfigurationRepository.cs" />
+    <Compile Include="IDisposableAction.cs" />
+    <Compile Include="Bus\Internals\Agent\AgentErrorEventArgs.cs" />
+    <Compile Include="Bus\Internals\Agent\AgentEventArgs.cs" />
+    <Compile Include="Bus\Internals\Agent\BaseAgent.cs" />
+    <Compile Include="Bus\Internals\Agent\IAgent.cs" />
+    <Compile Include="Bus\Internals\Agent\IAgentManager.cs" />
+    <Compile Include="Bus\Internals\Agent\IAgentRegistry.cs" />
+    <Compile Include="Bus\Internals\Agent\Impl\AgentManager.cs" />
+    <Compile Include="Bus\Internals\Agent\Impl\AgentRegistry.cs" />
+    <Compile Include="Configuration\Elements\BaseElementBuilder.cs" />
+    <Compile Include="Configuration\Bootstrapper\BaseBootstrapper.cs" />
+    <Compile Include="Configuration\Bootstrapper\Impl\LocalBusMessageConsumersBootstrapper.cs" />
+    <Compile Include="Configuration\Bootstrapper\Impl\LocalSubscriptionsBootstrapper.cs" />
+    <Compile Include="Configuration\Bootstrapper\Roles\BaseExternalBootstrapper.cs" />
+    <Compile Include="Configuration\Bootstrapper\Roles\BaseBusCustomInternalBootstrapper.cs" />
+    <Compile Include="Configuration\Bootstrapper\Roles\BaseBusStorageProvider.cs" />
+    <Compile Include="Configuration\Elements\ControlBusElementBuilder.cs" />
+    <Compile Include="Configuration\Elements\MessageBusElementBuilder.cs" />
+    <Compile Include="Configuration\Elements\MessagesElementBuilder.cs" />
+    <Compile Include="Configuration\Elements\SubscriptionManagerElementBuilder.cs" />
+    <Compile Include="Configuration\Elements\TasksElementBuilder.cs" />
+    <Compile Include="Configuration\Endpoint\EndpointConfiguration.cs" />
+    <Compile Include="Configuration\Endpoint\IEndpointConfiguration.cs" />
+    <Compile Include="Configuration\MonacoConfiguration.cs" />
+    <Compile Include="Configuration\MonacoFacility.cs" />
+    <Compile Include="Configuration\Profiles\IClientProfile.cs" />
+    <Compile Include="Configuration\Profiles\IPublisherProfile.cs" />
+    <Compile Include="Configuration\Profiles\IServerProfile.cs" />
+    <Compile Include="Consumes.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Tasks\EndpointHeartBeatTask.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Tasks\RecycleStatisticsTask.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Tasks\PrepareEndpointStatusTask.cs" />
+    <Compile Include="Bus\Exceptions\DispatcherDispatchException.cs" />
+    <Compile Include="Bus\Exceptions\InvalidEndpointUriAddressException.cs" />
+    <Compile Include="Bus\Exceptions\MessageBatchExceededException.cs" />
+    <Compile Include="Bus\Exceptions\MessageBatchExceededForMessageException.cs" />
+    <Compile Include="Bus\Exceptions\MonacoConfigurationException.cs" />
+    <Compile Include="Bus\Exceptions\SagaMessageCouldNotBeCorrelatedToOngoingSagaException.cs" />
+    <Compile Include="Extensions\ListExtensions.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointHeartbeatReceived.cs" />
+    <Compile Include="IMessage.cs" />
+    <Compile Include="Bus\Internals\Collections\IThreadSafeDictionary.cs" />
+    <Compile Include="Bus\Internals\Collections\IThreadSafeList.cs" />
+    <Compile Include="Bus\Internals\Collections\ThreadSafeDictionary.cs" />
+    <Compile Include="Bus\Internals\Collections\ThreadSafeList.cs" />
+    <Compile Include="Bus\Internals\Eventing\ComponentErrorEventArgs.cs" />
+    <Compile Include="Bus\Internals\Eventing\ComponentNotificationEventArgs.cs" />
+    <Compile Include="Bus\Internals\Eventing\ComponentStartedEventArgs.cs" />
+    <Compile Include="Bus\Internals\Eventing\ComponentStoppedEventArgs.cs" />
+    <Compile Include="Bus\Internals\Eventing\EndpointErrorReceivedEventArgs.cs" />
+    <Compile Include="Bus\Internals\Eventing\EndpointMessageReceivedEventArgs.cs" />
+    <Compile Include="Bus\Internals\Eventing\IEndpointEventBroadcaster.cs" />
+    <Compile Include="Bus\Internals\Eventing\IErrorEventBroadcaster.cs" />
+    <Compile Include="Bus\Internals\Eventing\INotificationEventBroadcaster.cs" />
+    <Compile Include="Bus\Internals\Eventing\IPausable.cs" />
+    <Compile Include="Bus\Internals\Eventing\IPollable.cs" />
+    <Compile Include="Bus\Internals\Eventing\IStartableEventBroadcaster.cs" />
+    <Compile Include="Bus\Internals\Reflection\Impl\DefaultReflection.cs" />
+    <Compile Include="Bus\Internals\Reflection\IReflection.cs" />
+    <Compile Include="Bus\Internals\Threading\Threading.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointMessageReceived.cs" />
+    <Compile Include="Bus\Services\HealthMonitoring\Messages\Events\EndpointMessageSent.cs" />
+    <Compile Include="OrchestratedBy.cs" />
+    <Compile Include="Produces.cs" />
+    <Compile Include="Bus\ServiceBusAsyncRequestResult.cs" />
+    <Compile Include="StartedBy.cs" />
+    <Compile Include="Subscriptions\Impl\Subscription.cs" />
+    <Compile Include="Subscriptions\ISubscription.cs" />
+    <Compile Include="Bus\Services\Subscriptions\SubscriptionsMessageConsumer.cs" />
+    <Compile Include="TransientConsumerOf.cs" />
+    <Compile Include="Transport\BaseTransport.cs" />
+    <Compile Include="Transport\ITransport.cs" />
+    <Compile Include="Transport\ITransportMessage.cs" />
+    <Compile Include="Transport\MessageReceivedEventArgs.cs" />
+    <Compile Include="Transport\ReceiverCache.cs" />
+    <Compile Include="Transport\TransportMessage.cs" />
+    <Compile Include="Bus\DisposableAction.cs" />
+    <Compile Include="Transport\Virtual\VirtualEndpoint.cs" />
+    <Compile Include="Transport\Virtual\VirtualEndportTransportRegistration.cs" />
+    <Compile Include="Transport\Virtual\VirtualTransport.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Extensibility\Storage\readme.txt" />
+    <Content Include="Extensibility\Transports\readme.txt" />
+    <Content Include="monaco.config.xml" />
+    <Content Include="credits.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Bus\Messages\For\Ping\" />
+    <Folder Include="Bus\Messages\For\Timeouts\" />
+    <Folder Include="Infrastructure\" />
+    <Folder Include="Transport\Msmq\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="monaco.config">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

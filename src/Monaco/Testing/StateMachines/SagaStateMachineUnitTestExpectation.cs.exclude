@@ -1,0 +1,227 @@
+﻿using System;
+using System.Collections.Generic;
+using Monaco.Sagas.StateMachine;
+using Monaco.Testing.Exceptions;
+using Monaco.Testing.Sagas;
+using Moq;
+
+namespace Monaco.Testing.StateMachines
+{
+	public class SagaStateMachineUnitTestExpectation : SagaUnitTestExpectation
+	{
+		private readonly SagaStateMachine _theStateMachine;
+		private bool _checkForCompletion;
+
+		public List<Action> PostConditions { get; private set; }
+		public State ExpectedState { get; private set; }
+
+		public SagaStateMachineUnitTestExpectation(SagaStateMachine theStateMachine, ref Mock<IServiceBus> theMessageBus)
+			: base(ref theMessageBus)
+		{
+			this._theStateMachine = theStateMachine;
+			this.PostConditions = new List<Action>();
+		}
+
+		/// <summary>
+		/// This will set the expectation that a message will be sent, disregarding the contents of the message.
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <returns></returns>
+		public SagaStateMachineUnitTestExpectation ExpectToSend<TMessage>()
+			where TMessage : IMessage
+		{
+			Action<TMessage> action = (m) => { };
+			base.ExpectToSend(action);
+			return this;
+		}
+
+		/// <summary>
+		/// This will set the expectation that a message will be sent, with the message containing specific information.
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <param name="sendAction">Lamda denoted the construction of the message to send.</param>
+		/// <returns></returns>
+		public new SagaStateMachineUnitTestExpectation ExpectToSend<TMessage>(Action<TMessage> sendAction)
+			where TMessage : IMessage
+		{
+			base.ExpectToSend(sendAction);
+			return this;
+		}
+
+		public new SagaStateMachineUnitTestExpectation ExpectToSendToDestination<TMessage>(Uri endpoint, Action<TMessage> sendAction)
+			where TMessage : IMessage
+		{
+			base.ExpectToSendToDestination(endpoint, sendAction);
+			return this;
+		}
+
+		/// <summary>
+		/// This will set the expectation that a message will be published, disregarding message contents.
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <returns></returns>
+		public new SagaStateMachineUnitTestExpectation ExpectToPublish<TMessage>()
+			where TMessage : IMessage
+		{
+			Action<TMessage> action = (m) => { };
+			base.ExpectToPublish(action);
+			return this;
+		}
+
+		/// <summary>
+		/// This will set the expectation that a message will be published with specific contents.
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <returns></returns>
+		public new SagaStateMachineUnitTestExpectation  ExpectToPublish<TMessage>(Action<TMessage> action)
+			where TMessage : IMessage
+		{
+			base.ExpectToPublish(action);
+			return this;
+		}
+
+		/// <summary>
+		/// This will set the expectation that a message will be replied to, disregarding message contents of the reply.
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <returns></returns>
+		public new SagaStateMachineUnitTestExpectation ExpectReply<TMessage>()
+			where TMessage : IMessage
+		{
+			Action<TMessage> action = (m) => { };
+			base.ExpectReply(action);
+			return this;
+		}
+
+		/// <summary>
+		/// This will set the expectation that a message will be replied to, with the message containing specific contents.
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <param name="action">Lamba representing the construction of the message.</param>
+		/// <returns></returns>
+		public new SagaStateMachineUnitTestExpectation ExpectReply<TMessage>(Action<TMessage> action)
+			where TMessage : IMessage
+		{
+			base.ExpectReply(action);
+			return this;
+		}
+
+		/// <summary>
+		/// This set the testing expectation of free-form code that will execute upon receiving a message
+		/// that can affect the state of the saga or test condition.
+		/// </summary>
+		/// <param name="theAction"></param>
+		/// <returns></returns>
+		public new SagaStateMachineUnitTestExpectation ExpectToDo(Action theAction)
+		{
+			base.ExpectToDo(theAction);
+			return this;
+		}
+
+		/// <summary>
+		/// This will set the expectation that a message will be delayed for further action by a saga state machine
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <param name="duration">Time to delay the message</param>
+		/// <param name="action">Lambda representing the message to construct for later processing</param>
+		/// <returns></returns>
+		public new SagaStateMachineUnitTestExpectation ExpectToDelay<TMessage>(TimeSpan duration, Action<TMessage> action)
+			where TMessage : IMessage
+		{
+			base.ExpectToDelay(duration, action);
+			return this;
+		}
+
+		/// <summary>
+		/// This will tell the test harness to fire a specific timeout message
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <param name="action"></param>
+		/// <returns></returns>
+		public SagaStateMachineUnitTestExpectation ExpeectToAFireTimeout<TMessage>(Action<TMessage> action)
+			where TMessage : IMessage
+		{
+			return this;
+		}
+
+		public SagaStateMachineUnitTestExpectation ExpectToFireTimeouts()
+		{
+			return this;
+		}
+
+		/// <summary>
+		/// This is the expectation that checks whether or not a state machine transistions to 
+		/// a given state based on the message passed in for processing.
+		/// </summary>
+		/// <param name="state"></param>
+		/// <returns></returns>
+		public SagaStateMachineUnitTestExpectation ExpectToTransitionToState(State state)
+		{
+			this.ExpectedState = state;
+
+			Action checkForTransitionAction = () =>
+			                                  	{
+													if (this.ExpectedState == null) return;
+
+													if (this._theStateMachine.CurrentState != this.ExpectedState)
+														throw new StateMachineStateTransitionInvocationException(this._theStateMachine.GetType(),
+														                                                         this._theStateMachine.CurrentMessage.GetType(),
+														                                                         this.ExpectedState.Name,
+														                                                         this._theStateMachine.CurrentState.Name);
+
+														//throw new Exception(string.Format(
+														//    "The state machine was expected to transition to state '{0}' but is currently in state '{1}'",
+														//        this.ExpectedState.Name, this._theStateMachine.CurrentState.Name));
+			                                  	};
+
+			this.PostConditions.Add(checkForTransitionAction);
+
+			return this;
+		}
+
+		/// <summary>
+		/// This is the expectation that is used to inspect whether or not the state machine is completed.
+		/// </summary>
+		/// <returns></returns>
+		public SagaStateMachineUnitTestExpectation ExpectToComplete()
+		{
+			this._checkForCompletion = true;
+
+			Action checkForCompletionAction = () =>
+			{
+				if (this._checkForCompletion)
+				{
+					if (!this._theStateMachine.IsCompleted)
+						throw new StateMachineCompletionInvocationException(this._theStateMachine.GetType(), this._theStateMachine.CurrentMessage.GetType());
+						//throw new Exception("The state machine was expected to complete but did not.");
+				}
+			};
+
+			this.PostConditions.Add(checkForCompletionAction);
+
+			return this;
+		}
+
+		public void AssertThatStateMachineCompleted()
+		{
+			if(this._checkForCompletion)
+			{
+				if (!this._theStateMachine.IsCompleted)
+					throw new StateMachineCompletionInvocationException(this._theStateMachine.GetType(), this._theStateMachine.CurrentMessage.GetType());
+					//throw new Exception("The state machine was expected to complete but did not.");
+			}
+		}
+
+		public void AssertThatStateWasChanged()
+		{
+			if(this.ExpectedState == null) return;
+
+			if (this._theStateMachine.CurrentState != this.ExpectedState)
+				throw new Exception(string.Format(
+					"The state machine was expected to transition to state '{0}' but is currently in state '{1}'",
+						this.ExpectedState.Name, this._theStateMachine.CurrentState.Name));
+		}
+
+
+	}
+}

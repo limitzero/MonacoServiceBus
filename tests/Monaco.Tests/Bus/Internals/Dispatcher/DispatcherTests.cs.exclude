@@ -1,0 +1,208 @@
+using System;
+using System.Collections.Generic;
+using Castle.MicroKernel;
+using Monaco.Bus;
+using Monaco.Bus.Internals.Reflection;
+using Monaco.Bus.MessageManagement.MessageHandling.Dispatching.ToSaga;
+using Monaco.Infrastructure.Logging;
+using Monaco.Persistance.Repositories;
+
+using Monaco.Tests.Messages;
+using Rhino.Mocks;
+using Xunit;
+
+namespace Monaco.Tests.Bus.Internals.Dispatcher
+{
+    public class DispatcherTests
+    {
+        // subject:
+        private readonly IServiceBus _bus;
+        private readonly SagaMessageDispatcher _dispather;
+
+        // collaborators:
+        private readonly IKernel _kernel;
+        private readonly MockRepository _mocks;
+        private readonly IReflection _reflection;
+        private readonly ISagaDataRepository<TestSagaData> _sagaDataFinder;
+        private readonly ISagaRepository _sagaRepository;
+    	private readonly ILogger _logger;
+
+    	public DispatcherTests()
+        {
+            _mocks = new MockRepository();
+            _kernel = _mocks.DynamicMock<IKernel>();
+        	_logger = _mocks.DynamicMock<ILogger>();
+            _bus = _mocks.DynamicMock<IServiceBus>();
+            _reflection = _mocks.DynamicMock<IReflection>();
+            _sagaRepository = _mocks.DynamicMock<ISagaRepository>();
+            _sagaDataFinder = _mocks.DynamicMock<ISagaDataRepository<TestSagaData>>();
+            _dispather = new SagaMessageDispatcher(_logger, _sagaRepository, _reflection);
+        }
+
+        [Fact]
+        public void
+            can_invoke_saga_data_finder_and_saga_repository_when_dispatching_message_to_saga_and_save_after_execution_when_started
+            ()
+        {
+            string component = typeof (TestSaga).FullName;
+
+            var saga = new TestSaga();
+            var data = new TestSagaData();
+            Type theSagaFinderType = typeof (ISagaDataRepository<>).MakeGenericType(data.GetType());
+
+            using (_mocks.Record())
+            {
+                Expect.Call(_reflection.InvokeCreateForSagaDataRepository(_sagaDataFinder, Guid.NewGuid()))
+                    .IgnoreArguments()
+                    .Repeat.AtLeastOnce()
+                    .Return(data)
+                    .Message(
+                        "The saga data finder should create the data on the first run to the saga (i.e. StartedBy<>).");
+
+                _sagaRepository.Save(saga);
+                LastCall.Repeat.AtLeastOnce()
+                    .Message("The saga repository should save the current saga instance if it is not completed.");
+
+                _reflection.InvokeSaveForSagaDataRepository(_sagaDataFinder, data);
+                LastCall.IgnoreArguments()
+                    .Repeat.AtLeastOnce()
+                    .Message("The reflection method should be invoked to save the saga data for the saga");
+            }
+
+            using (_mocks.Playback())
+            {
+            	_dispather.Dispatch(_bus, saga, new Envelope( new TestMessage()));
+            }
+        }
+
+        [Fact]
+        public void
+            can_invoke_saga_data_finder_and_saga_repository_when_dispatching_message_to_saga_and_remove_after_saga_is_completed
+            ()
+        {
+            string component = typeof (TestSaga).FullName;
+
+            var saga = new TestSaga();
+            var data = new TestSagaData();
+            Type theSagaFinderType = typeof (ISagaDataRepository<>).MakeGenericType(data.GetType());
+
+            using (_mocks.Record())
+            {
+				//Expect.Call(_sagaRepository.Find(Guid.NewGuid()))
+				//    .IgnoreArguments()
+				//    .Repeat.AtLeastOnce()
+				//    .Return(saga)
+				//    .Message("The repository should return the instance of the saved saga.");
+
+                Expect.Call(_reflection.InvokeFindForSagaDataRepository(_sagaDataFinder, Guid.NewGuid()))
+                    .IgnoreArguments()
+                    .Repeat.AtLeastOnce()
+                    .Return(data)
+                    .Message("The saga data finder should return the previously saved data on the saga.");
+
+                _sagaRepository.Remove(Guid.NewGuid());
+                LastCall.IgnoreArguments()
+                    .Repeat.AtLeastOnce()
+                    .Message("The saga repository should remove the saga upon completion.");
+
+                _reflection.InvokeRemoveForSagaDataRepository(_sagaDataFinder, Guid.NewGuid());
+                LastCall.IgnoreArguments()
+                    .Repeat.AtLeastOnce()
+                    .Message("The reflection method should be invoked to remove the saga data for the saga");
+            }
+
+            using (_mocks.Playback())
+            {
+            	_dispather.Dispatch(_bus, saga, new Envelope(new AnotherTestMessage()));
+            }
+        }
+    }
+
+    public class TestSagaRepository : ISagaRepository
+    {
+        #region ISagaRepository Members
+
+        public ISaga Find(Guid instanceId)
+        {
+            return null;
+        }
+
+    	public ICollection<ISaga> Sagas
+    	{
+    		get { throw new NotImplementedException(); }
+    	}
+
+    	public void Save(ISaga saga)
+        {
+        }
+
+        public void Remove(Guid instanceId)
+        {
+        }
+
+        #endregion
+    }
+
+    public class TestDataFinder<TDATA> :
+        ISagaDataRepository<TDATA> where TDATA : class, ISagaData, new()
+    {
+        #region ISagaDataRepository<TDATA> Members
+
+        public TDATA Find(Guid instanceId)
+        {
+            return default(TDATA);
+        }
+
+        public TDATA Create(Guid instanceId)
+        {
+            return new TDATA {CorrelationId = instanceId};
+        }
+
+        public void Save(TDATA data)
+        {
+        }
+
+        public void Remove(Guid instanceId)
+        {
+        }
+
+        #endregion
+    }
+
+    public class TestSagaData : ISagaData
+    {
+		public virtual Guid CorrelationId { get; set; }
+		public string State { get; set; }
+    }
+
+    public class TestSaga :
+        Saga<TestSagaData>,
+        StartedBy<TestMessage>,
+        OrchestratedBy<AnotherTestMessage>
+    {
+        #region ISaga<TestSagaData> Members
+
+        public Guid InstanceId { get; set; }
+        public bool IsCompleted { get; set; }
+        public TestSagaData Data { get; set; }
+
+        #endregion
+
+        #region Orchestrates<AnotherTestMessage> Members
+
+        public void Consume(AnotherTestMessage message)
+        {
+            IsCompleted = true;
+        }
+
+        #endregion
+
+        #region StartedBy<TestMessage> Members
+
+        public void Consume(TestMessage message)
+        {
+        }
+
+        #endregion
+    }
+}

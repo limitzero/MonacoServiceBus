@@ -1,0 +1,106 @@
+using System;
+using Monaco.Bus.Internals;
+using Monaco.Bus.Messages.For.Control;
+using Monaco.Extensions;
+using Monaco.Services.HealthMonitoring.Messages;
+using Monaco.Services.HealthMonitoring.Messages.Commands;
+using Monaco.Services.HealthMonitoring.Messages.Events;
+using Monaco.Services.Timeout.Messages;
+using Monaco.Services.Timeout.Messages.Commands;
+using EndpointTakenOffline = Monaco.Bus.Events.EndpointTakenOffline;
+
+namespace Monaco.Endpoint.Management.Maintenance
+{
+	public class EndpointMaintenanceService :
+		MessageConsumer,
+		Consumes<TakeEndpointOffline>,
+		Consumes<BringEndpointBackOnline>
+	{
+		private readonly IServiceBus _bus;
+
+		public EndpointMaintenanceService(IServiceBus bus)
+		{
+			_bus = bus;
+		}
+
+		public void Consume(TakeEndpointOffline message)
+		{
+			//var timespan = new TimeSpan().CreateFromInterval(message.Duration);
+			//var online = new BringEndpointBackOnline { Endpoint = _bus.Transport.EndpointUri };
+
+			//var timeout = new ScheduleTimeout(timespan.Value, online);
+			//_bus.Send(timeout);
+
+			//((IStartable)_bus.Transport).Stop();
+
+			//var controlMessage = new EndpointTakenOffline
+			//                        {
+			//                            Duration = message.Duration,
+			//                            Endpoint = _bus.Transport.EndpointUri
+			//                        };
+
+			//SendControlMessage(controlMessage);
+		}
+
+		public void Consume(BringEndpointBackOnline message)
+		{
+			//if (((IStartable)_bus.Transport).IsRunning != true)
+			//    ((IStartable)_bus.Transport).Start();
+
+			//var controlMessage = new EndpointBackOnline()
+			//{
+			//    Endpoint = _bus.Transport.EndpointUri
+			//};
+
+			//SendControlMessage(controlMessage);
+		}
+
+		public override void Define()
+		{
+			UponReceiving<TakeEndpointOffline>(message =>
+					{
+						var timespan = new TimeSpan().CreateFromInterval(message.Duration);
+						var online = new BringEndpointBackOnline { Endpoint = _bus.Transport.EndpointUri };
+
+						if (timespan.HasValue == false) return;
+
+						var timeout = new ScheduleTimeout(timespan.Value, online);
+						Bus.Send(timeout);
+
+						((IStartable)Bus.Transport).Stop();
+
+						var controlMessage = new EndpointTakenOffline
+						{
+							Duration = message.Duration,
+							Endpoint = _bus.Transport.EndpointUri
+						};
+
+						SendControlMessage(controlMessage);
+					});
+
+
+			UponReceiving<BringEndpointBackOnline>(message =>
+				{
+					if (((IStartable)Bus.Transport).IsRunning != true)
+						((IStartable)Bus.Transport).Start();
+
+					var controlMessage = new EndpointBackOnline()
+					{
+						Endpoint = Bus.Transport.EndpointUri
+					};
+
+					SendControlMessage(controlMessage);
+				});
+
+		}
+
+		private void SendControlMessage(IMessage message)
+		{
+			var control = Bus.GetControlEndpoint();
+
+			if (control == null) return;
+
+			control.Receive(Bus, message);
+		}
+	}
+}

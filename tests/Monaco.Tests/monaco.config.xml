@@ -1,0 +1,77 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+
+<configuration>
+
+  <components />
+
+  <facilities>
+
+    <facility id="monaco.esb">
+
+      <!-- configuration of message bus  -->
+      <message-bus>
+        <endpoint 
+          uri="vm://monaco.esb" 
+          concurrency="1" 
+          max-retries="2" 
+          status-interval="00:00:20" 
+          status-interval-grace-period="00:00:05" />
+      </message-bus>
+
+      <!--  listing of the assemblies that contain the messages -->
+      <messages>
+        <add name="Monaco.Tests" />
+      </messages>
+
+      <!-- service to communicate over MSMQ endpoint and process messages 
+      <service name="my first service">
+        <implementation>
+          <add ref="my.first.service" />
+        </implementation>
+        <endpoint
+              uri="msmq://localhost/first.service"
+              concurrency="1"
+              max-retries="2"
+              status-interval="00:00:02"
+              status-interval-grace-period="00:00:05" />
+      </service>
+      -->
+
+      <!-- listing of the user-specified scheduled tasks that occur on the message bus 
+      <tasks>
+        <add
+             ref="myPingMessageTask"
+             name="Ping Task"
+             method="Execute"
+             interval="00:00:01"
+             haltOnError="true"
+             forceStart="true"/>
+        <add 
+             type="Cairo.ESB.Tasks.MyTask, Cario.ESB"
+             name="Ping Task"
+             method="Execute"
+             interval="00:00:01"
+             haltOnError="true"
+             forceStart="true"/>
+      </tasks>
+      -->
+
+      <!-- name of the control bus where the status messages will be sent (optional) -->
+      <control-bus uri="msmq://localhost/monaco.esb.control" />
+
+      <!-- the subscription manager is the dedicated endpoint reserved for pub/sub implementations -->
+      <subscription-manager uri="msmq://localhost/monaco.subscriptions">
+        <repository ref="subscription.cache" />
+      </subscription-manager>
+
+      <!-- the endpoint manager will broadcast information about the 
+              service endpoints on a given interval and optionally recycle the 
+              endpoint statistics calculation on a given interval -->
+      <endpoint-service-manager broadcast-status-interval="00:01:00" recycle-statistics-interval="00:05:00" />
+
+
+    </facility>
+
+  </facilities>
+
+</configuration>

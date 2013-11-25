@@ -1,0 +1,63 @@
+﻿Storage configuration for an endpoint
+
+public class SampleEndpoint : BaseEndpointConfiguration
+{
+	public override ConfigureEndpoint()
+	{
+	}
+}
+
+Persistance Storage Layout:
+
+sample.endpoint							-> endpoint for receiving business specific messages 
+sample.endpoint.control             -> endpoint for receiving control messages
+sample.endpoint.timeouts          -> endpoint for receiving timeout messages
+sample.endpoint.subscriptions  -> endpoint for receiving subscription information
+
+
+
+public ConsumeControlMessageTask : 
+	Produces<ProcessControlMessage>
+{
+	public ProcessControlMessage Produce()
+	{
+		return new ProcessControlMessage();
+	}
+}
+
+public class ControlMessageConsumer
+ : Consume<ProcessControlMessage>
+{
+	public void Consume(ProcessControlMessage message)
+	{
+		var envelope = 
+	}
+}
+
+
+Testing StateMachines
+
+Test.For<MyStateMachine>(
+    Verify(
+        When(statemachine => statemachine.NewOrderArrived)
+            .ExpectToPublish<PrepareInvoice>())); 
+        )
+
+public class TestScenarioVerification<TStateMachine> where TStateMachine : SagaStateMachine
+{
+    public void Verify(ITestExpectation<TStateMachine> expectation)
+    {
+        
+    }
+
+    public TestScenarioVerification<TStateMachine> When<TMessage>(Expression<Func<TStateMachine, Event<TMessage>>> @event)
+     where TMessage : IMessage
+    {
+        
+    }
+}
+
+public class TestScenarioExpectaion<TStateMachine> where TStateMachine : SagaStateMachine
+{
+    TestScenarioExpectaion<TStateMachine> ExpectToPublish<TMessage>() where TMessage : IMessage
+}

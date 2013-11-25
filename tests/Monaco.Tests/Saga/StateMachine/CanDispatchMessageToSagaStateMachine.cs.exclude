@@ -1,0 +1,146 @@
+using System;
+using System.Collections.Generic;
+using Castle.MicroKernel;
+using Monaco.Bus;
+using Monaco.Bus.Internals.Reflection;
+using Monaco.Bus.MessageManagement.MessageHandling.Dispatching.ToStateMachine;
+using Monaco.Extensions;
+using Monaco.Infrastructure.Logging;
+using Monaco.Persistance.Repositories;
+
+using Monaco.Sagas.StateMachine;
+using Monaco.Sagas.StateMachine.Verbalizer;
+using Rhino.Mocks;
+using Xunit;
+
+namespace Monaco.Tests.Saga.StateMachine
+{
+	public class CanDispatchMessageToSagaStateMachine
+	{
+		public static List<IMessage> _received_messages;
+		private readonly SagaStateMachineMessageDispatcher _dispatcher;
+		private readonly MockRepository _mockRepository;
+		private readonly IServiceBus _serviceBus;
+		private readonly IKernel _kernel;
+		private readonly ILogger _logger;
+		private readonly TestDispatchSaga _saga;
+		private readonly IReflection _reflection;
+		private readonly ISagaRepository _repository;
+		private Guid _correlationId;
+
+		public CanDispatchMessageToSagaStateMachine()
+		{
+			_mockRepository = new MockRepository();
+			_serviceBus = _mockRepository.DynamicMock<IServiceBus>();
+			_logger = _mockRepository.DynamicMock<ILogger>();
+			_reflection = _mockRepository.DynamicMock<IReflection>();
+			_repository = _mockRepository.DynamicMock<ISagaRepository>();
+
+			_kernel = new DefaultKernel();
+			_kernel.AddComponentInstance(typeof(IServiceBus).Name, typeof(IServiceBus), _serviceBus);
+			_kernel.AddComponentInstance(typeof(ILogger).Name, typeof(ILogger), _logger);
+
+			_saga = new TestDispatchSaga();
+
+			_correlationId = CombGuid.NewGuid();
+			_saga.InstanceId = _correlationId;
+
+			_received_messages = new List<IMessage>();
+
+			_dispatcher = new SagaStateMachineMessageDispatcher(_kernel, _logger, _reflection, _repository);
+
+			System.Diagnostics.Debug.WriteLine(new SagaStateMachineVerbalizer().Verbalize<TestDispatchSaga>());
+		}
+
+		[Fact]
+		public void can_send_message_to_new_saga_definition_and_invoke_method_for_started_by_contract()
+		{
+			_dispatcher.Dispatch(_serviceBus, _saga, new Envelope(new DispatchMessage1()));
+			Assert.True(Utilities.IsMessageReceived<DispatchMessage1>(_received_messages));
+		}
+
+		[Fact]
+		public void can_send_subsequent_message_to_started_saga_when_advanced_to_next_state_and_invoke_method_for_the_orchestrates_contract()
+		{
+			// move to the next state in order to trigger the subsequent processing 
+			// (and correlate messages since no persistance happened for the saga):
+			_saga.CurrentState = TestDispatchSaga.WaitingForMessage;
+			var message = new DispatchMessage2 {CorrelationId = _saga.InstanceId};
+
+			_dispatcher.Dispatch(_serviceBus, _saga, new Envelope(message));
+
+			Assert.True(_saga.IsCompleted);
+			Assert.True(Utilities.IsMessageReceived<DispatchMessage2>(_received_messages));
+		}
+
+		public class TestDispatchSaga : SagaStateMachine,
+				StartedBy<DispatchMessage1>,
+				OrchestratedBy<DispatchMessage2>
+		{
+			// events on the state machine (one per message):
+			public Event<DispatchMessage1> Started { get; set; }
+			public Event<DispatchMessage2> Continue { get; set; }
+
+			// states for the state machine:
+			public static State WaitingForMessage { get; set; }
+
+			public TestDispatchSaga()
+			{
+			}
+
+			public void Consume(DispatchMessage1 message)
+			{
+				_received_messages.Add(message);
+			}
+
+			public void Consume(DispatchMessage2 message)
+			{
+				_received_messages.Add(message);
+			}
+
+			public override void Define()
+			{
+				Name = "The Test Saga For Dispatching Messages to a Saga State Machine";
+
+				Initially(
+					When(Started)
+					.TransitionTo(WaitingForMessage)
+					);
+
+				While(WaitingForMessage,
+					When(Continue)
+						 .Do(() =>
+								{
+									// some code here can be executed...
+								})
+						 .Publish<DispatchMessage3>(m => m.Id = 1)
+						.Complete()
+						);
+			}
+
+		}
+
+	}
+
+	public class DispatchMessage1 : IMessage
+	{
+		public int Id { get; set; }
+		public Guid CorrelationId { get; set; }
+	}
+
+	public class DispatchMessage2 : IMessage
+	{
+		public int Id { get; set; }
+		public Guid CorrelationId { get; set; }
+	}
+
+	public class DispatchMessage3 : IMessage
+	{
+		public int Id { get; set; }
+		public Guid CorrelationId { get; set; }
+	}
+
+
+
+
+}

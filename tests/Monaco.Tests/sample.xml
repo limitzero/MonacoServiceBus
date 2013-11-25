@@ -1,0 +1,362 @@
+﻿<z:anyType i:type="a:LocalSubscriptionsMessage" xmlns:z="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:a="http://schemas.datacontract.org/2004/07/Monaco.Messages.For.Subscriptions">
+  <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+  <a:_x003C_Subscriptions_x003E_k__BackingField xmlns:b="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingStartMessage
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/correlated.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingStartMessage
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/correlated.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingMessage1
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/correlated.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingMessage1
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/correlated.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingMessage2
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/correlated.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingMessage2
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/correlated.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+NonCorrelatedMessage
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/correlated.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+CorrelatingSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaCorrelatedMessageTests+NonCorrelatedMessage
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/correlated.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.ConsumerTests+LocalConsumer, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.ConsumerTests+Message1
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.consumer
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.ConsumerTests+LocalConsumer, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.ConsumerTests+BatchMessage1
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.consumer
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.ConsumerTests+LocalConsumer, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.ConsumerTests+BatchMessage2
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.consumer
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.ConsumerTests+LocalConsumer, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.ConsumerTests+DelayedMessage
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.consumer
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.ConsumerTests+LocalConsumer, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>IBMTrade</c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.consumer
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSagaMessage
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSagaMessage
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSagaMessage2
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSagaMessage2
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSagaMessage3
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSaga, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        Monaco.Tests.Saga.SagaTests+LocalSagaMessage3
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.saga
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Integration.FileToMsmqTests+CanonicalPurchaseOrderConsumer, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>
+        CanonicalPurchaseOrder
+      </c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>
+        msmq://localhost/local.canonical.consumer
+      </c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+    <b:anyType i:type="c:Subscription" xmlns:c="http://schemas.datacontract.org/2004/07/Monaco.Subscriptions.Impl">
+      <c:_x003C_Component_x003E_k__BackingField>
+        Monaco.Tests.Integration.FileToMsmqTests+FilePurchaseOrderConsumer, Monaco.Tests, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+      </c:_x003C_Component_x003E_k__BackingField>
+      <c:_x003C_IsActive_x003E_k__BackingField>true</c:_x003C_IsActive_x003E_k__BackingField>
+      <c:_x003C_Message_x003E_k__BackingField>PurchaseOrder</c:_x003C_Message_x003E_k__BackingField>
+      <c:_x003C_Uri_x003E_k__BackingField>file://c:\trash\file</c:_x003C_Uri_x003E_k__BackingField>
+    </b:anyType>
+  </a:_x003C_Subscriptions_x003E_k__BackingField>
+</z:anyType>
+
+<!--
+<z:anyType i:type="a:ServicedEndpointsMessage" xmlns:z="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:a="http://schemas.datacontract.org/2004/07/Monaco.Messages">
+  <a:_x003C_ServicedEndpoints_x003E_k__BackingField>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>msmq://localhost/correlated.saga</a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>local correlated saga service</a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>msmq://localhost/local.consumer</a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>local consumer service</a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>msmq://localhost/local.saga</a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>local saga service</a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>msmq://localhost/local.canonical.consumer</a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>local canonical consumer service</a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>file://c:\trash\file</a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>local file consumer service</a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+  </a:_x003C_ServicedEndpoints_x003E_k__BackingField>
+</z:anyType>
+-->
+
+<z:anyType i:type="a:ServicedEndpointsMessage" xmlns:z="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:a="http://schemas.datacontract.org/2004/07/Monaco.Messages">
+  <a:_x003C_ServicedEndpoints_x003E_k__BackingField>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>
+        msmq://localhost/correlated.saga
+      </a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>
+        local correlated saga service
+      </a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>
+        msmq://localhost/local.consumer
+      </a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>
+        local consumer service
+      </a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>
+        msmq://localhost/local.canonical.consumer
+      </a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>
+        local canonical consumer service
+      </a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>file://c:\trash\file</a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>
+        local file consumer service
+      </a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+    <a:ServicedEndpointMessage>
+      <a:_x003C_BusUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_BusUri_x003E_k__BackingField>
+      <a:_x003C_EndpointUri_x003E_k__BackingField>
+        msmq://localhost/local.saga
+      </a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_Name_x003E_k__BackingField>local saga service</a:_x003C_Name_x003E_k__BackingField>
+    </a:ServicedEndpointMessage>
+  </a:_x003C_ServicedEndpoints_x003E_k__BackingField>
+</z:anyType>
+
+
+<z:anyType i:type="a:EndpointHealthSagaState" xmlns:z="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:a="http://schemas.datacontract.org/2004/07/Monaco.Endpoint.Health.Saga">
+  <a:_x003C_InstanceId_x003E_k__BackingField>
+    00000000-0000-0000-0000-000000000000
+  </a:_x003C_InstanceId_x003E_k__BackingField>
+  <a:_x003C_Statistics_x003E_k__BackingField>
+    <a:EndpointStatistic>
+      <a:_x003C_EndpointName_x003E_k__BackingField />
+      <a:_x003C_EndpointUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_HeartbeatStatus_x003E_k__BackingField>Normal</a:_x003C_HeartbeatStatus_x003E_k__BackingField>
+      <a:_x003C_Heartbeats_x003E_k__BackingField xmlns:b="http://schemas.datacontract.org/2004/07/Monaco.Messages.For.Endpoints" />
+      <a:_x003C_NumberOfMessagesReceived_x003E_k__BackingField>0</a:_x003C_NumberOfMessagesReceived_x003E_k__BackingField>
+      <a:_x003C_NumberOfMessagesSent_x003E_k__BackingField>1</a:_x003C_NumberOfMessagesSent_x003E_k__BackingField>
+    </a:EndpointStatistic>
+    <a:EndpointStatistic>
+      <a:_x003C_EndpointName_x003E_k__BackingField />
+      <a:_x003C_EndpointUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_HeartbeatStatus_x003E_k__BackingField>Normal</a:_x003C_HeartbeatStatus_x003E_k__BackingField>
+      <a:_x003C_Heartbeats_x003E_k__BackingField xmlns:b="http://schemas.datacontract.org/2004/07/Monaco.Messages.For.Endpoints" />
+      <a:_x003C_NumberOfMessagesReceived_x003E_k__BackingField>0</a:_x003C_NumberOfMessagesReceived_x003E_k__BackingField>
+      <a:_x003C_NumberOfMessagesSent_x003E_k__BackingField>1</a:_x003C_NumberOfMessagesSent_x003E_k__BackingField>
+    </a:EndpointStatistic>
+    <a:EndpointStatistic>
+      <a:_x003C_EndpointName_x003E_k__BackingField />
+      <a:_x003C_EndpointUri_x003E_k__BackingField>vm://monaco.esb</a:_x003C_EndpointUri_x003E_k__BackingField>
+      <a:_x003C_HeartbeatStatus_x003E_k__BackingField>Normal</a:_x003C_HeartbeatStatus_x003E_k__BackingField>
+      <a:_x003C_Heartbeats_x003E_k__BackingField xmlns:b="http://schemas.datacontract.org/2004/07/Monaco.Messages.For.Endpoints" />
+      <a:_x003C_NumberOfMessagesReceived_x003E_k__BackingField>0</a:_x003C_NumberOfMessagesReceived_x003E_k__BackingField>
+      <a:_x003C_NumberOfMessagesSent_x003E_k__BackingField>1</a:_x003C_NumberOfMessagesSent_x003E_k__BackingField>
+    </a:EndpointStatistic>
+  </a:_x003C_Statistics_x003E_k__BackingField>
+</z:anyType>

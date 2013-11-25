@@ -1,0 +1,185 @@
+using System;
+using System.Linq;
+using System.Threading;
+using Monaco.Bus;
+using Monaco.Bus.Internals;
+using Monaco.Bus.Internals.Collections;
+using Monaco.Endpoint;
+
+namespace Monaco.Transport.Virtual
+{
+	/// <summary>
+	/// In-memory transport for testing without interaction to a
+	/// transport with persistance mechanism. All of the configured
+	/// endpoints will be hosted on a single bus instance  
+	/// to take the place of a physical message store per endpoint.
+	/// Addressing scheme for transport: vm://{unique endpoint name}
+	/// </summary>
+	public class VirtualTransport : BaseTransport<object>
+	{
+		private readonly ReaderWriterLockSlim _locationsLock = new ReaderWriterLockSlim();
+		private IThreadSafeDictionary<string, IThreadSafeList<IEnvelope>> _locations;
+		private bool _isDisconnected;
+
+		public VirtualTransport(VirtualEndpoint endpoint)
+			:base(endpoint)
+		{
+			
+		}
+
+		public override void Connect()
+		{
+			_locations = new ThreadSafeDictionary<string, IThreadSafeList<IEnvelope>>();
+
+			this.Endpoint.Localize();
+
+			InitializeEndpoint(this.Endpoint.LocalizedEndpointUri);
+
+			_isDisconnected = false;
+		}
+
+		public override void Disconnect()
+		{
+			if (_locations != null)
+			{
+				_locations.Clear();
+			}
+			_locations = null;
+
+			_isDisconnected = true;
+		}
+
+		public override IEnvelope DoReceive(TimeSpan timeout)
+		{
+			IEnvelope envelope = null;
+			IThreadSafeList<IEnvelope> envelopes = null;
+
+			if (_isDisconnected) return envelope;
+
+			if ((envelope = PeekMessage(this.Endpoint.LocalizedEndpointUri, ref envelopes)) != null)
+			{
+				RemoveMessage(ref envelope, ref envelopes);
+			}
+
+			return envelope;
+		}
+
+		public override void DoSend(IEnvelope envelope)
+		{
+			this.DoSend(this.Endpoint, envelope);
+		}
+
+		public override void DoSend(IEndpoint endpoint, IEnvelope envelope)
+		{
+			IThreadSafeList<IEnvelope> envelopes = null;
+			endpoint.Localize();
+
+			if (_isDisconnected) return;
+
+			if (string.IsNullOrEmpty(endpoint.LocalizedEndpointUri) == false)
+			{
+				CreateEndpoint(endpoint.LocalizedEndpointUri, ref envelopes);
+			}
+
+			GetEndpoint(endpoint.LocalizedEndpointUri, ref  envelopes);
+			EnqueueMessage(envelope, ref envelopes);
+		}
+
+		private IEnvelope PeekMessage(string endpoint,
+			ref IThreadSafeList<IEnvelope> envelopes)
+		{
+			IEnvelope envelope = null;
+
+			if (this.Disposed) return envelope;
+
+			_locationsLock.EnterReadLock();
+			try
+			{
+				envelopes = _locations[endpoint];
+
+				if (envelopes == null) return envelope;
+
+				envelope = envelopes.Select(item => item).FirstOrDefault();
+
+			}
+			finally
+			{
+				_locationsLock.ExitReadLock();
+			}
+
+			return envelope;
+		}
+
+		private void RemoveMessage(ref IEnvelope envelope,
+			ref IThreadSafeList<IEnvelope> envelopes)
+		{
+			_locationsLock.EnterWriteLock();
+			try
+			{
+				envelopes.Remove(envelope);
+			}
+			catch
+			{
+			}
+			finally
+			{
+				_locationsLock.ExitWriteLock();
+			}
+		}
+
+		private void CreateEndpoint(string endpoint, ref IThreadSafeList<IEnvelope> envelopes)
+		{
+			_locationsLock.EnterWriteLock();
+			try
+			{
+				envelopes = new ThreadSafeList<IEnvelope>();
+				_locations.Add(endpoint, envelopes);
+			}
+			catch
+			{
+			}
+			finally
+			{
+				_locationsLock.ExitWriteLock();
+			}
+		}
+
+		private void GetEndpoint(string endpoint, ref IThreadSafeList<IEnvelope> envelopes)
+		{
+			_locationsLock.EnterReadLock();
+			try
+			{
+				envelopes = _locations[endpoint];
+			}
+			catch
+			{
+			}
+			finally
+			{
+				_locationsLock.ExitReadLock();
+			}
+		}
+
+		private void EnqueueMessage(IEnvelope envelope,
+			ref IThreadSafeList<IEnvelope> envelopes)
+		{
+			_locationsLock.EnterWriteLock();
+			try
+			{
+				envelopes.Add(envelope);
+			}
+			catch
+			{
+			}
+			finally
+			{
+				_locationsLock.ExitWriteLock();
+			}
+		}
+
+		private void InitializeEndpoint(string endpoint)
+		{
+			_locations.Add(endpoint, new ThreadSafeList<IEnvelope>());
+		}
+	}
+}

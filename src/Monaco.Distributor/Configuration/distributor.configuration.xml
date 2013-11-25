@@ -1,0 +1,26 @@
+﻿<castle>
+
+	<facilities>
+
+		<facility id="monaco.distributor">
+
+			<fabric>
+				<!-- endpoint: location of where the load balance endpoint is for dispatching to workers in pool-->
+				<!-- threads: number of threads to allocate to pool-->
+				<!-- requests: number of requests to be served by each worker in the pool for load balancing -->
+				<worker.pool endpoint="msmq://localhost/load.balanced.endpoint.1" threads="2" requests="10">
+					<!-- endpoint: location of where service will process messages-->
+					<!-- weight: relative importance of location relative to other worker endpoints -->
+					<!-- requests: override of requests for the entire pool for this one worker -->
+					<worker endpoint="msmq://localhost/load.worker1" weight="50" requests="10"/>
+					<worker endpoint="msmq://localhost/load.worker2" weight="50" requests="10"/>
+				</worker.pool>
+				
+				<!-- can have more pools here for load balanced endpoint  .... -->
+				
+			</fabric>
+
+		</facility>
+
+	</facilities>
+</castle>

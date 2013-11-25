@@ -1,0 +1,509 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Castle.MicroKernel;
+using Monaco.Bus.Internals;
+using Monaco.Bus.Internals.Reflection;
+using Monaco.Infrastructure.Logging;
+using Monaco.Persistance.Repositories;
+using Monaco.Sagas;
+using Monaco.Sagas.StateMachine;
+
+namespace Monaco.Bus.MessageManagement.MessageHandling.Dispatching.ToStateMachine
+{
+	public class SagaStateMachineMessageDispatcher : ISagaStateMachineMessageDispatcher
+	{
+		private readonly IKernel _kernel;
+		private readonly ILogger _logger;
+		private readonly IReflection _reflection;
+		private bool _isMocked;
+		private string _endpoint;
+
+		public SagaStateMachineMessageDispatcher(IKernel kernel,
+												 ILogger logger,
+												 IReflection reflection)
+		{
+			_kernel = kernel;
+			_logger = logger;
+			_reflection = reflection;
+		}
+
+		public void Dispatch(IServiceBus bus, IConsumer consumer, IEnvelope envelope)
+		{
+			var sagaMessage = envelope.Body.Payload as ISagaMessage;
+			SagaStateMachine saga = consumer as SagaStateMachine;
+
+			if (saga == null)
+				throw new Exception("The consumer passed to the saga state machine dispatcher must be derived from "
+									+ consumer.GetType().FullName);
+
+			if (sagaMessage == null)
+				throw new Exception("The messages passed into the saga state machine must be derived from"
+					+ typeof(ISagaMessage).FullName);
+
+			// checked for the saga state machine to be in unit test or "mocked" state:
+			_isMocked = bus.GetType().FullName.ToLower().Contains("proxy");
+
+			if (!_isMocked)
+			{
+				_endpoint = bus.Transport.EndpointUri;
+			}
+			else
+			{
+				_endpoint = "<mocked>";
+			}
+
+			// define the state machine with the current instance of the service bus:
+			try
+			{
+				saga.Bus = bus;
+			}
+			catch
+			{
+			}
+
+			_logger.LogDebugMessage(string.Format("Start: dispatching message '{0}' to saga state machine '{1}'.",
+												  sagaMessage.GetType().FullName, consumer.GetType().FullName));
+
+			envelope.Header.RecordStage(consumer, sagaMessage, "Dispatch");
+
+			bool isStartOfNewSaga = IsStartOfNewSaga(saga, sagaMessage);
+
+			if (isStartOfNewSaga)
+			{
+				Initialize(saga, sagaMessage);
+			}
+			else
+			{
+				ISagaData aStateMachineData = _reflection.GetProperty<ISagaData>(saga, "Data");
+
+				// try to find the saga from the saga finder for the indicated saga message:
+				ISaga aSagaStateMachine =
+					RetreiveStateMachineFromSagaFinder(sagaMessage);
+
+				if (aSagaStateMachine == null)
+				{
+					// next, try to find the saga based on the correlation id on the saga message:
+					aSagaStateMachine = RetriveStateMachineFromMessageCorrelationId(saga, sagaMessage);
+				}
+
+				if (aSagaStateMachine == null && !_isMocked)
+				{
+					throw new Exception(string.Format("No saga state machine could be retreived for message '{0}'.",
+						sagaMessage.GetType().FullName));
+				}
+
+				if(aSagaStateMachine != null)
+				{
+					saga = aSagaStateMachine as SagaStateMachine;
+				}
+
+			}
+
+			ConsumeMessage(saga, sagaMessage, isStartOfNewSaga);
+
+			PersistSaga(saga);
+
+			_logger.LogDebugMessage(string.Format("Complete: dispatching message '{0}' to saga state machine '{1}'.",
+												  sagaMessage.GetType().FullName, consumer.GetType().FullName));
+		}
+
+		/// <summary>
+		/// This will try to find the saga state machine from the repository based on the current state machine type and the 
+		/// current message passed in from the service bus for the state machine to operate on.
+		/// </summary>
+		/// <param name="sagaMessage"></param>
+		/// <returns></returns>
+		private ISaga RetreiveStateMachineFromSagaFinder(ISagaMessage sagaMessage)
+		{
+			ISaga theStateMachine = null;
+
+			// first let's try to find the saga using the configured finder for the state machine and current message:
+			Type sagaFinderType =
+				typeof(ISagaFinder<>).MakeGenericType(new Type[] { sagaMessage.GetType() });
+
+			object aStateMachineSagaFinder = null;
+
+			try
+			{
+				aStateMachineSagaFinder = _kernel.Resolve(sagaFinderType);
+			}
+			catch
+			{
+				// no saga finder configured for state machine:
+			}
+
+			// invoke the saga state machine finder for the current message and inspect the results:
+			if (aStateMachineSagaFinder != null)
+			{
+				theStateMachine = _reflection.InvokeSagaStateMachineFinderByMessage(aStateMachineSagaFinder, sagaMessage);
+			}
+
+			return theStateMachine;
+		}
+
+		private ISaga RetriveStateMachineFromMessageCorrelationId(ISaga saga, ISagaMessage sagaMessage)
+		{
+			ISaga aSaga = null;
+
+			var persisterType = typeof(ISagaRepository<>).MakeGenericType(saga.GetType());
+
+			try
+			{
+				var persister = _kernel.Resolve(persisterType);
+				aSaga = _reflection.InvokeSagaRepositoryFind(persister, sagaMessage.CorrelationId);
+			}
+			catch
+			{
+			}
+
+			return aSaga;
+		}
+
+		private static bool IsStartOfNewSaga(IConsumer theSaga, ISagaMessage sagaMessage)
+		{
+			bool isStartingNewSaga = false;
+			Type theMessageType = sagaMessage.GetType();
+
+			Type theStartedByInterfaceType = (from contract in theSaga.GetType().GetInterfaces()
+											  where contract.IsGenericType
+													&&
+													contract.GetGenericArguments()[0] == theMessageType
+													&&
+													contract.FullName.StartsWith(typeof(StartedBy<>).FullName)
+											  select contract).FirstOrDefault();
+
+			if (theStartedByInterfaceType != null)
+			{
+				isStartingNewSaga = true;
+			}
+
+			return isStartingNewSaga;
+		}
+
+		private void Initialize(IConsumer theSaga, ISagaMessage sagaMessage)
+		{
+			var instanceId = CombGuid.NewGuid();
+
+			// assign the instance identifier/tracking token:
+			if (sagaMessage.CorrelationId != Guid.Empty)
+			{
+				((ISaga)theSaga).InstanceId = sagaMessage.CorrelationId;
+			}
+			else
+			{
+				((ISaga)theSaga).InstanceId = instanceId;
+				sagaMessage.CorrelationId = instanceId;
+			}
+
+			var dataProperty = (from match in theSaga.GetType().GetProperties()
+								where typeof(ISagaData).IsAssignableFrom(match.PropertyType)
+								select match).FirstOrDefault();
+
+			// create the new instance of the saga data and place it on the current saga state machine:
+			if (dataProperty != null)
+			{
+				var data = _reflection.BuildInstance(dataProperty.PropertyType) as ISagaData;
+
+				// need to grab data for saga and sync the instance identifier
+				// with the instance identifier of the saga (for the first time access):
+				if (data != null)
+				{
+					data.CorrelationId = sagaMessage.CorrelationId;
+					data.Version = ((SagaStateMachine)theSaga).Version;
+					_reflection.SetProperty(theSaga, "Data", data);
+				}
+
+			}
+		}
+
+		private void PersistSaga(ISaga saga)
+		{
+			var stateMachine = saga as SagaStateMachine;
+
+			if (stateMachine == null) return;
+
+			stateMachine.Bus = null;
+
+			var persisterType = typeof(ISagaRepository<>).MakeGenericType(stateMachine.GetType());
+
+			object persister = null;
+
+			try
+			{
+				persister = _kernel.Resolve(persisterType);
+			}
+			catch (Exception exception)
+			{
+				throw new Exception(string.Format("No saga persistance was registered on the endpoint '{0}'. " +
+					"Please ensure that the saga persistance has been defined in the configuration file or endpoint " +
+					"configuration class and the concrete implementation is derived from " + typeof(ISagaRepository<>),
+					   this._endpoint), exception);
+			}
+
+			try
+			{
+				if (stateMachine.IsCompleted)
+				{
+					_reflection.InvokeSagaRepositoryRemove(persister, stateMachine.InstanceId);
+				}
+				else
+				{
+					var data = _reflection.GetProperty<ISagaData>(saga, "Data");
+					data.CorrelationId = stateMachine.InstanceId;
+					_reflection.InvokeSagaRepositorySave(persister, stateMachine);
+				}
+			}
+			catch
+			{
+			}
+		}
+
+		private static Type ContainsInterface(object theComponent, Type interfaceType)
+		{
+			Type theInterface = (from contract in theComponent.GetType().GetInterfaces()
+								 where contract.IsGenericType
+									   &&
+									   contract.FullName.StartsWith(interfaceType.FullName)
+								 select contract).FirstOrDefault();
+
+			return theInterface;
+		}
+
+		private void ConsumeMessage<TMessage>(ISaga saga, TMessage message, bool isStarting = false)
+			where TMessage : ISagaMessage
+		{
+			SagaStateMachine stateMachine = saga as SagaStateMachine;
+			//List<SagaStateMachineDefinedTriggerCondition> triggerConditions = null;
+			//var messageActions = new List<MessageAction>();
+			//bool hasJumpedStateTransistion = false;
+
+			if (stateMachine == null) return;
+
+			// define all of the trigger conditions for processing the current message:
+			if (stateMachine.TriggerConditions.Count == 0)
+			{
+				stateMachine.Define();
+			}
+
+			State currentState = stateMachine.CurrentState;
+
+			if (currentState != null)
+				_logger.LogDebugMessage(string.Format("Current state of saga state machine '{0}' is '{1}'.",
+													  saga.GetType().FullName, currentState.Name));
+
+			// set the current message that the state machine is consuming:
+			stateMachine.CurrentMessage = message;
+
+			SagaStateMachineDefinedTriggerCondition definedTriggerCondition = null;
+
+			// consume the message on the state machine first (this is the "When" part):
+			MethodInfo method = new MessageToMethodMapper().Map(saga, message);
+			object invoker = new MessageMethodInvoker().Invoke(saga, method, message);
+
+			// re-adjust the state of the machine if it has been forcibly set (the define method
+			// pushes it to the "Start" state if not retrived from the persistance store):
+			if (currentState != null)
+			{
+				if (currentState.Name != "Start")
+				{
+					stateMachine.CurrentState = currentState;
+				}
+			}
+
+			var conditions = stateMachine.TriggerConditions;
+
+			if (isStarting)
+			{
+				definedTriggerCondition = conditions
+					.Where(x => x.Stage == SagaStage.Initially).SingleOrDefault();
+			}
+			else
+			{
+				// check the "While" conditions for the current message and state:
+				definedTriggerCondition = (from match in conditions
+										   let theActions = match.Condition.MessageActions
+										   where match.Stage == SagaStage.While
+										   && match.Message.GetType() == message.GetType()
+										   select match).FirstOrDefault();
+			}
+
+			// nothing matches for the linear stage/state transitions defined for the message, 
+			// need to extract the trigger condition by looking at the message actions
+			// to see what message defined the trigger conditions and ignore the current state:
+			//if (definedTriggerCondition == null)
+			//{
+			//    hasJumpedStateTransistion = true;
+			//    definedTriggerCondition = CheckIfMessageCausedJumpInState(message, triggerConditions);
+			//}
+
+			// nothing we can do here, no state or message matching the trigger condition can be found
+			// (most likely the action was carried out on the Consume<T>(T message) method):
+			if (definedTriggerCondition == null) return;
+
+			//if (hasJumpedStateTransistion)
+			//{
+			//    currentState = stateMachine.CurrentState;
+
+			//    _logger.LogDebugMessage(string.Format("Saga state machine '{0}' has jumped from state '{1}' to state '{2}'.",
+			//                                          saga.GetType().FullName,
+			//                                          currentState.Name,
+			//                                          definedTriggerCondition.Condition.State.Name));
+
+			//    stateMachine.CurrentState = definedTriggerCondition.Condition.State;
+			//}
+
+			State previousState = stateMachine.CurrentState;
+
+			// always skip the "When" event since it is fired above on consuming the message
+			// and execute the subsquent actions on the current state for the state machine:
+
+			// check the correlation on the current message to the state machine:
+			CheckForCorrelation(stateMachine, message, definedTriggerCondition);
+
+			// first, transition to the state indicated then execute the actions 
+			// so that the state machine will always be in the proper state when
+			// the message actions are executed (if we do it after, the state machine
+			// will be in an inconsistent state):
+			currentState = TransitionToIndicatedState(stateMachine, currentState, definedTriggerCondition);
+
+			// second, execute all of the supporting actions except the "When", "Correlate", and "TransitionTo":
+			definedTriggerCondition.Condition.Recorder.Play(message);
+
+			// TODO: keep this if all else goes wrong!!!
+			//var actions = (from match in definedTriggerCondition.Condition.MessageActions
+			//               where match.ActionType != SagaMessageActionType.Transition
+			//                     && match.ActionType != SagaMessageActionType.When
+			//                     && match.ActionType != SagaMessageActionType.Correlate
+			//               select match).Distinct().ToList();
+
+			//foreach (var messageAction in actions)
+			//{
+			//    if (messageAction.Action != null)
+			//        messageAction.Action(message);
+
+			//    if (messageAction.ActionType == SagaMessageActionType.Complete)
+			//    {
+			//        stateMachine.IsCompleted = true;
+			//        break;
+			//    }
+			//}
+
+			//foreach (MessageAction messageAction in definedTriggerCondition.Condition.MessageActions)
+			//{
+			//    if (messageAction.ActionType == SagaMessageActionType.When) continue;
+
+			//    if (messageAction.Action != null)
+			//        messageAction.Action();
+
+			//    // invoke the actions that the state machine can not inherently do on its own:
+			//    switch (messageAction.ActionType)
+			//    {
+			//        case SagaMessageActionType.Transition:
+			//            currentState = messageAction.State;
+			//            InvokeSagaMethod(sagaStateMachine, "MarkTransitionTo", new object[] { messageAction.State});
+			//            //sagaStateMachine.MarkTransitionTo(messageAction.State);
+			//            break;
+
+			//        case SagaMessageActionType.Complete:
+			//            sagaStateMachine.IsCompleted = true;
+			//            break;
+			//    }
+
+			//}
+
+			// indicate the change in the state machine:
+			if (currentState != null &&
+				previousState != null &&
+				previousState != currentState)
+			{
+				_logger.LogDebugMessage(string.Format("Saga state machine '{0}' has transitioned from state '{1}' to state '{2}'.",
+													  saga.GetType().FullName,
+													  previousState.Name,
+													  currentState.Name));
+			}
+		}
+
+
+		private State TransitionToIndicatedState(SagaStateMachine stateMachine,
+			State currentState,
+			SagaStateMachineDefinedTriggerCondition definedTriggerCondition)
+		{
+			var transition = (from match in definedTriggerCondition.Condition.MessageActions
+							  where match.ActionType == SagaMessageActionType.Transition
+							  select match).FirstOrDefault();
+
+			if (transition != null)
+			{
+				currentState = transition.State;
+				stateMachine.MarkTransitionTo(transition.State);
+			}
+
+			var data = _reflection.GetProperty<ISagaData>(stateMachine, "Data");
+
+			if (data != null)
+			{
+				data.State = currentState;
+			}
+
+			return currentState;
+		}
+
+		private void CheckForCorrelation<TMessage>(SagaStateMachine stateMachine,
+			TMessage message,
+			SagaStateMachineDefinedTriggerCondition triggerCondition)
+			where TMessage : ISagaMessage
+		{
+			var correlation = (from match in triggerCondition.Condition.MessageActions
+							   where match.ActionType == SagaMessageActionType.Correlate
+							   select match).FirstOrDefault();
+
+			if (correlation != null)
+			{
+				correlation.Action(message);
+			}
+
+			//if(correlation != null && ContainsInterface(correlation, typeof(CorrelateMessageAction<>)) != null)
+			//{
+			//    var correlationAction = correlation as CorrelateMessageAction<TMessage>;
+			//    if(correlationAction.CorrelateAction(message) == false)
+			//    {
+			//        throw new SagaMessageCouldNotBeCorrelatedToOngoingSagaException(message.GetType(),
+			//                                                                        stateMachine.GetType());
+			//    }
+			//}
+		}
+
+		private static SagaStateMachineDefinedTriggerCondition CheckIfMessageCausedJumpInState(
+				ISagaMessage message, IEnumerable<SagaStateMachineDefinedTriggerCondition> triggerConditions)
+		{
+			SagaStateMachineDefinedTriggerCondition definedTriggerCondition = null;
+
+			// nothing matches for the linear state transitions defined for the message
+			// on the state machine (waterfall in nature), need to extract the trigger 
+			// condition by looking at the message actions to see what message defined 
+			// the trigger conditions and ignore the current state on the state machine:
+			foreach (SagaStateMachineDefinedTriggerCondition triggerCondition in triggerConditions)
+			{
+				if (triggerCondition.Condition.MessageActions != null)
+				{
+					foreach (MessageAction messageAction in triggerCondition.Condition.MessageActions)
+					{
+						if (messageAction.Message == null) continue;
+
+						if (messageAction.Message.GetType() == message.GetType())
+						{
+							definedTriggerCondition = triggerCondition;
+							break;
+						}
+					}
+				}
+
+				if (definedTriggerCondition != null) break;
+			}
+
+			return definedTriggerCondition;
+		}
+	}
+}

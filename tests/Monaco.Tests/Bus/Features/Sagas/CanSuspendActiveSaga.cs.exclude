@@ -1,0 +1,103 @@
+using System;
+using System.Threading;
+using Monaco.Configuration;
+using Monaco.Configuration.Profiles;
+
+using Monaco.Sagas.StateMachine;
+using Xunit;
+
+namespace Monaco.Tests.Bus.Features.Sagas
+{
+	public class SuspendSagaEndpointConfig : BaseEndpointConfiguration, IClientProfile
+	{
+		public override void ConfigureEndpoint()
+		{
+			MapMessages<CanUseBusToSuspendActiveSaga.SuspendSaga>();
+		}
+	}
+
+	[Serializable]
+	public class SuspendSagaStartMessage : IMessage
+	{
+		public Guid CorrelationId { get; set; }
+	}
+
+	public class CanUseBusToSuspendActiveSaga : IDisposable
+	{
+		public static Guid _state = Guid.Empty;
+		public static Guid _stateForSuspendCompleted = Guid.Empty;
+		public static TimeSpan _suspendDuration;
+		public static ManualResetEvent _wait;
+		private MonacoContainer _container;
+
+		public CanUseBusToSuspendActiveSaga()
+		{
+			_container = new MonacoContainer(@"saga.bus.config");
+			_wait = new ManualResetEvent(false);
+			_state = Guid.NewGuid();
+
+			_suspendDuration = TimeSpan.FromSeconds(5);
+		}
+
+		public void Dispose()
+		{
+			if (_container != null)
+			{
+				_container.Dispose();
+			}
+			_container = null;
+
+			if (_wait != null)
+			{
+				_wait.Close();
+				_wait = null;
+			}
+		}
+
+		[Fact]
+		public void can_suspend_saga_and_resume_after_specific_duration_with_state_passed_to_completion_method()
+		{
+			using (var bus = _container.Resolve<IServiceBus>())
+			{
+				bus.ConfiguredWithEndpoint<SuspendSagaEndpointConfig>();
+				bus.Start();
+
+				bus.Publish<SuspendSagaStartMessage>(m => m.CorrelationId = _state);
+
+				_wait.WaitOne(TimeSpan.FromSeconds(_suspendDuration.Seconds * 2));
+
+				Assert.Equal(_state, _stateForSuspendCompleted);
+			}
+		}
+
+		public class SuspendSaga : SagaStateMachine,
+			StartedBy<SuspendSagaStartMessage>
+		{
+
+			public Event<SuspendSagaStartMessage> Started { get; set; }
+			public State Suspended { get; set; }
+
+			public void Consume(SuspendSagaStartMessage message)
+			{
+
+			}
+
+			public override void Define()
+			{
+				Initially(
+					When(Started)
+						.Do(() => this.Suspend(_suspendDuration, _state))
+						.TransitionTo(Suspended)
+					);
+			}
+
+			public override void OnSuspendCompleted(object state)
+			{
+				_stateForSuspendCompleted = (Guid)state;
+				_wait.Set();
+			}
+
+		}
+	}
+
+}

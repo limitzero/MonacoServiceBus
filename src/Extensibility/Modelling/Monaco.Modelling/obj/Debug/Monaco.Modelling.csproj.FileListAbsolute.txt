@@ -1,0 +1,15 @@
+C:\repositories\Monaco_clean\build\Monaco.Modelling.dll
+C:\repositories\Monaco_clean\build\Monaco.Modelling.pdb
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Monaco.Modelling.dll
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Monaco.Modelling.pdb
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Monaco.dll
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Castle.MicroKernel.dll
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Castle.Core.dll
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Castle.Windsor.dll
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Polenter.SharpSerializer.dll
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Castle.DynamicProxy2.dll
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Moq.dll
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\bin\Debug\Monaco.pdb
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\obj\Debug\ResolveAssemblyReference.cache
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\obj\Debug\Monaco.Modelling.dll
+C:\repositories\Monaco_clean\src\Extensibility\Modelling\Monaco.Modelling\obj\Debug\Monaco.Modelling.pdb

@@ -1,0 +1,16 @@
+C:\repositories\Monaco\build\Monaco.Msmq.Transport.dll
+C:\repositories\Monaco\build\Monaco.Msmq.Transport.pdb
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Monaco.Msmq.Transport.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Monaco.Msmq.Transport.pdb
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Castle.Core.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Castle.MicroKernel.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Monaco.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Castle.Windsor.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\log4net.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Rhino.Mocks.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Polenter.SharpSerializer.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Castle.DynamicProxy2.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\bin\Debug\Monaco.pdb
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\obj\Debug\ResolveAssemblyReference.cache
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\obj\Debug\Monaco.Msmq.Transport.dll
+C:\repositories\Monaco\src\Monaco.Msmq.Transport\obj\Debug\Monaco.Msmq.Transport.pdb

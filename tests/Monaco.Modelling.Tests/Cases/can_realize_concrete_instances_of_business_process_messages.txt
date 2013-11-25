@@ -1,0 +1,24 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using Monaco;
+using Monaco.StateMachine;
+          
+namespace Monaco.Modelling.ServiceModel.Messages
+{
+    // Message(s) from business process model 'AcmeBusinessProcessModel':
+              
+    /// <summary> 
+    /// A sample description for the shipment received message.
+    /// </summary> 
+    public class ShipmentReceived : ISagaMessage { public Guid CorrelationId {get; set} }
+          
+    public class ScheduledProcessed : ISagaMessage { public Guid CorrelationId {get; set} }
+          
+    public class InvoiceProcessed : ISagaMessage { public Guid CorrelationId {get; set} }
+          
+    public class PriceCalculationFailed : ISagaMessage { public Guid CorrelationId {get; set} }
+          
+    public class ShipmentCancelled : ISagaMessage { public Guid CorrelationId {get; set} }
+          
+}

@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<!-- add the section below inside of the 'message.bus' element to configure Sql Server storage of messages  -->
+<sqldb.transport>
+
+	<!-- user that will connect to the server -->
+	<user.name></user.name>
+
+	<!-- user password that will be used to connect to the server -->
+	<user.password></user.password>
+
+	<!-- name of the database server -->
+	<server.name></server.name>
+
+	<!-- name of the database  -->
+	<catalog.name></catalog.name>
+
+	<!-- signals the transport to remove messages from the queue when completed processing (true, false) -->
+	<auto.delete></auto.delete>
+	
+</sqldb.transport>

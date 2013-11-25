@@ -1,0 +1,122 @@
+using System;
+using Monaco.Bus.Entities;
+using Monaco.Bus.MessageManagement.Serialization;
+using Monaco.Persistance.Repositories;
+using Monaco.Sagas;
+using NHibernate;
+
+namespace Monaco.NHibernate.Storage.Sagas
+{
+    public class NHibernateSagaDataRepository<TData> : 
+		IStateMachineDataRepository<TData> where TData : class, ISagaData, new()
+    {
+        private readonly ISession _session;
+        private readonly ISerializationProvider _serialization;
+
+        public NHibernateSagaDataRepository(ISession session, ISerializationProvider serialization)
+        {
+            _session = session;
+            _serialization = serialization;
+        }
+
+        public TData Find(Guid instanceId)
+        {
+            TData theSagaData = null;
+			SagaDataInstance thread = this.FindThread(instanceId);
+
+            if (thread != null)
+            {
+                try
+                {
+                    object instance = _serialization.Deserialize(thread.Instance);
+
+                    if (instance != null)
+                    {
+                        theSagaData = instance as TData;
+                        theSagaData.CorrelationId = thread.Id;
+                    }
+                }
+                catch (Exception e)
+                {
+                    throw;
+                }
+            }
+
+            return theSagaData;
+        }
+
+        public TData Create(Guid instanceId)
+        {
+            return new TData() { CorrelationId = instanceId };
+        }
+
+        public void Save(TData data)
+        {
+			SagaDataInstance previousThread = this.FindThread(data.CorrelationId);
+			SagaDataInstance theThread = this.CreateThread(data, previousThread);
+
+            using (var txn = _session.BeginTransaction())
+            {
+                try
+                {
+                    _session.Save(theThread);
+                    txn.Commit();
+                }
+                catch (Exception e)
+                {
+                    txn.Rollback();
+                    throw e;
+                }
+            }
+        }
+
+        public void Remove(Guid instanceId)
+        {
+			SagaDataInstance theThread = this.FindThread(instanceId);
+
+            if (theThread != null)
+            {
+                using (var txn = _session.BeginTransaction())
+                {
+                    try
+                    {
+                        _session.Delete(theThread);
+                        txn.Commit();
+                    }
+                    catch (Exception e)
+                    {
+                        txn.Rollback();
+                        throw e;
+                    }
+                }
+            }
+        }
+
+		private SagaDataInstance FindThread(Guid instanceId)
+        {
+			SagaDataInstance thread = _session.Get<SagaDataInstance>(instanceId);
+            return thread;
+        }
+
+		private SagaDataInstance CreateThread(TData data, SagaDataInstance previousThread)
+        {
+			SagaDataInstance theThread = new SagaDataInstance();
+
+            if (previousThread != null)
+            {
+                theThread.CreatedOn = previousThread.CreatedOn;
+            }
+            else
+            {
+                theThread.CreatedOn = DateTime.Now;
+                theThread.ModifiedOn = DateTime.Now;
+            }
+
+            theThread.Id = data.CorrelationId;
+            theThread.Instance = _serialization.SerializeToBytes(data);
+            theThread.SagaDataName = data.GetType().FullName;
+
+            return theThread;
+        }
+    }
+}

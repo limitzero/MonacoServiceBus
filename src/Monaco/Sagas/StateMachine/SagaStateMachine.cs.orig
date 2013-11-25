@@ -1,0 +1,480 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Xml.Serialization;
+using Monaco.Bus.Messages.For.Sagas;
+using Monaco.Bus.Messages.For.Timeouts;
+using Monaco.Extensions;
+
+namespace Monaco.Sagas.StateMachine
+{
+
+	/* State Machine Syntax
+	 * 
+	 * Initially(
+	 *	   When(<some state>, 
+	 *		  
+	 *	);
+	 * 
+	 * 
+	 * 
+	 * 
+	 * 
+	 * 
+	 * 
+	 */ 
+
+	public abstract class SagaStateMachine : ISaga
+	{
+		[XmlIgnore] 
+		private ISagaEventTriggerCondition _condition;
+
+		/// <summary>
+		/// Gets or sets the current instance of the <seealso cref="IServiceBus"/> for the saga instance.
+		/// </summary>
+		[XmlIgnore]
+		public IServiceBus Bus { get; set; }
+
+		/// <summary>
+		/// Gets the set of trigger conditions that can happen on the saga instance when a message is received.
+		/// </summary>
+		[XmlIgnore]
+		public List<SagaStateMachineDefinedTriggerCondition> TriggerConditions { get; private set; }
+
+		/// <summary>
+		/// Gets or sets the name for the saga state machine.
+		/// </summary>
+		public string Name { get; set; }
+
+		/// <summary>
+		/// Gets or sets the instance identifier for the saga instance.
+		/// </summary>
+		public Guid InstanceId { get; set; }
+
+		/// <summary>
+		/// Gets or sets the flag to indicate whether or not the process has completed.
+		/// </summary>
+		public bool IsCompleted { get; set; }
+
+		/// <summary>
+		/// Gets or sets the flag to indicate whether or not the process is suspended.
+		/// </summary>
+		public bool IsSuspended { get; set; }
+
+		/// <summary>
+		/// Gets or sets the current state of the saga state machine.
+		/// </summary>
+		public State CurrentState { get; set; }
+
+		/// <summary>
+		/// Gets or sets the message that the saga is currently consuming.
+		/// </summary>
+		public ISagaMessage CurrentMessage { get; set; }
+
+		/// <summary>
+		/// Gets or sets the version of the state machine.
+		/// </summary>
+		public Version Version { get; set; }
+
+		protected SagaStateMachine()
+		{
+			this.TriggerConditions = new List<SagaStateMachineDefinedTriggerCondition>();
+			this.PrepareStatesForStateMachine();
+		}
+
+		/// <summary>
+		/// This will reset the trigger conditions for the state machine in transitioning
+		/// from one state to the next.
+		/// </summary>
+		public void Reset()
+		{
+			this.TriggerConditions = new List<SagaStateMachineDefinedTriggerCondition>();
+		}
+
+		/// <summary>
+		/// This is the marker for defining the state machine and its events for handling messages.
+		/// </summary>
+		public abstract void Define();
+
+		/// <summary>
+		/// This will mark the begining of the saga instance, which usually maps to the <seealso cref="StartedBy{T}"/>
+		/// contract for message consumption.
+		/// </summary>
+		/// <param name="condition">"When" condition that starts actions for processing</param>
+		public void Initially(ISagaEventTriggerCondition condition)
+		{
+			// add the event trigger condition to the collection and mark it as "Initially";
+			_condition.State = new State("Start");
+
+			if (this.CurrentState != null)
+			{
+				this.CurrentState = _condition.State;
+			}
+
+			var definedTriggerCondition = new SagaStateMachineDefinedTriggerCondition(SagaStage.Initially,
+																					  _condition);
+
+			if (this.TriggerConditions.Exists(x => x.Stage == SagaStage.Initially))
+				throw new Exception("The saga " + this.GetType().FullName +
+					" can not be configured with multiple initial conditons for starting the saga.");
+
+			this.TriggerConditions.Add(definedTriggerCondition);
+		}
+
+		/// <summary>
+		/// This will mark the subsequent processing of the saga instance, which usually maps 
+		/// to the <seealso cref="OrchestratedBy{T}"/> contract for message consumption with
+		/// only the arrival of a message and no state transition is needed.
+		/// </summary>
+		/// <param name="condition">"When" condition that starts actions for processing</param>
+		public void Also(ISagaEventTriggerCondition condition)
+		{
+			// add the event trigger condition to the collection and mark it as "Initially";
+			_condition.State = new State("Also-" + CombGuid.NewGuid());
+			var definedTriggerCondition = new SagaStateMachineDefinedTriggerCondition(SagaStage.Also,
+																					  _condition);
+
+			this.CurrentState = _condition.State;
+			this.TriggerConditions.Add(definedTriggerCondition);
+		}
+
+		/// <summary>
+		/// This will mark the subsequent processing of the saga instance, which usually maps 
+		/// to the <seealso cref="OrchestratedBy{T}"/> contract for message consumption after a 
+		/// particular state has been reached.
+		/// </summary>
+		/// <param name="state"></param>
+		/// <param name="condition">"When" condition that starts actions for processing</param>
+		public void While(State state, ISagaEventTriggerCondition condition)
+		{
+			// add the event trigger condition to the collection, set the state, and mark it as "While";
+			_condition.State = state;
+
+			var definedTriggerCondition = new SagaStateMachineDefinedTriggerCondition(SagaStage.While,
+																					  condition);
+
+			this.TriggerConditions.Add(definedTriggerCondition);
+		}
+
+		/// <summary>
+		/// This signals an event where a message is received on the saga state machine 
+		/// and processing will begin in accordance to what the message means.
+		/// </summary>
+		/// <typeparam name="TMessage"></typeparam>
+		/// <param name="when"></param>
+		/// <returns></returns>
+		public SagaEventTriggerCondition<TMessage> When<TMessage>(Event<TMessage> when)
+			where TMessage : ISagaMessage, new()
+		{
+			string @event = this.FindNameForEvent(typeof(Event<TMessage>));
+
+			// force the saga to consume the current message that matches the event condition:
+			_condition = new SagaEventTriggerCondition<TMessage>(this,
+				new TMessage(),
+			   () => ((Consumes<TMessage>)this).Consume((TMessage)this.CurrentMessage),
+			   @event);
+			
+			return _condition as SagaEventTriggerCondition<TMessage>;
+		}
+
+		/// <summary>
+		/// This will mark the saga as "completed" and signal the removal of the instance
+		/// from the persistance store.
+		/// </summary>
+		public void MarkAsCompleted()
+		{
+			IsCompleted = true;
+		}
+
+		/// <summary>
+		/// This will allow the current state machine to be forced to transition to a new state.
+		/// </summary>
+		public State MarkTransitionTo(State state)
+		{
+			this.CurrentState = state;
+			return state;
+		}
+
+		/// <summary>
+		/// This will suspend this saga state machine for a given duration. After the duration has passed, 
+		/// the <seealso cref="OnSuspendCompleted"/> method will be called on the saga instance
+		/// to process any state that was passed from the initial suspend request.
+		/// </summary>
+		/// <param name="duration"></param>
+		/// <param name="state"></param>
+		public void Suspend(TimeSpan duration, object state = null)
+		{
+			var suspendMessage = new SuspendSagaMessage { InstanceId = this.InstanceId, State = state, Saga = this.GetType() };
+			this.Bus.ConsumeMessages(new ScheduleTimeout(this.InstanceId, duration, suspendMessage));
+			this.IsSuspended = true;
+		}
+
+		/// <summary>
+		///  This will be called after the saga state machine has been 
+		///  resumed after the suspension period.
+		/// </summary>
+		/// <param name="state"></param>
+		public virtual void OnSuspendCompleted(object state)
+		{
+		}
+
+		/// <summary>
+		/// This will initialize all of the states on the state machine and set the name 
+		/// of the <seealso cref="State"/> to the name of the property defining the 
+		/// state.
+		/// </summary>
+		private void PrepareStatesForStateMachine()
+		{
+			var properties = (from property in this.GetType().GetProperties()
+							  where typeof(State).IsAssignableFrom(property.PropertyType)
+							  && property.Name != "CurrentState"
+							  select property).Distinct().ToList();
+
+			// create the state with the name based on the property:
+			foreach (var property in properties)
+			{
+				var state = new State(property.Name);
+				property.SetValue(this, state, null);
+			}
+		}
+
+		private string FindNameForEvent(Type @event)
+		{
+			string eventName = string.Empty;
+
+			var eventProperty = (from property in this.GetType().GetProperties()
+								 where property.PropertyType == @event
+								 select property).FirstOrDefault();
+
+			if (eventProperty != null)
+			{
+				eventName = eventProperty.Name;
+			}
+
+			return eventName;
+		}
+	}
+
+	/// <summary>
+	/// Base implementation of a long-running process with a defined persisted 
+	/// data entity for keeping data between long-running process calls.
+	/// </summary>
+	/// <typeparam name="TData">Type of the data/state to keep persisted between calls.</typeparam>
+	[Serializable]
+	public abstract class SagaStateMachine<TData> : SagaStateMachine
+		where TData : class, ISagaData, new()
+	{
+		/// <summary>
+		/// Gets or sets the data/state associated with the saga state machine.
+		/// </summary>
+		public TData Data { get; set; }
+
+		/// <summary>
+		/// Gets the set of correlations that define how a message should be matched to the current saga instance.
+		/// </summary>
+		[XmlIgnore]
+		public IDictionary<Type, Expression<Func<TData, ISagaMessage, bool>>> Correlations { get; private set; }
+
+		protected SagaStateMachine()
+			:base()
+		{
+			this.Data = new TData();
+			this.Correlations = new Dictionary<Type, Expression<Func<TData, ISagaMessage, bool>>>();
+			//this.CurrentState = new Start();
+		}
+
+		/// <summary>
+		/// This will create an expression used to correlate a message to the saga instance.
+		/// </summary>
+		/// <example>
+		///  Correlate{MyMessage}( (this, message) => (saga.Data.TransactionId = message.TransactionId));
+		/// </example>
+		/// <typeparam name="TMessage">Current message type to correlate</typeparam>
+		/// <param name="correlation">Expression used to determine if the message can be correlated.</param>
+		public void Correlate<TMessage>(Expression<Func<TData, TMessage, bool>> correlation)
+			where TMessage : ISagaMessage
+		{
+			if (this.Correlations.ContainsKey(typeof(TMessage)) == false)
+			{
+				ParameterExpression sagaData = Expression.Parameter(typeof(ISagaData), "data");
+				ParameterExpression sagaMessage = Expression.Parameter(typeof(ISagaMessage), "message");
+
+				Expression<Func<TData, ISagaMessage, bool>> theCorrelation =
+					Expression.Lambda<Func<TData, ISagaMessage, bool>>
+						(correlation.Body,
+						 sagaData,
+						 sagaMessage
+						);
+
+				this.Correlations.Add(typeof(TMessage), theCorrelation);
+			}
+
+		}
+	
+		/// <summary>
+		/// This will be executed by the dispatcher to see if the current 
+		/// message is correlated to the given instance of the state machine's
+		/// data configuration.
+		/// </summary>
+		/// <param name="message"></param>
+		/// <returns></returns>
+		public bool IsCorrelated(ISagaMessage message)
+		{
+			bool result = false;
+			var correlation = this.Correlations[message.GetType()];
+			if (correlation == null) return result;
+
+			result = correlation.Compile()(this.Data, message);
+			return result;
+		}
+
+	}
+
+	// <summary>
+	// Base implementation of a long-running process with a defined persisted 
+	// data entity for keeping data between long-running process calls.
+	// </summary>
+	// <typeparam name="TData">Type of the data/state to keep persisted between calls.</typeparam>
+	//[Serializable]
+	//public abstract class SagaStateMachine<TData> : ISaga,
+	//    ISagaStateMachineData<TData>
+	//    where TData : class, ISagaData, new()
+	//{
+	//    [XmlIgnore]
+	//    private SagaEventTriggerCondition _sagaEventTriggerCondition;
+
+	//    /// <summary>
+	//    /// Gets or sets the current instance of the <seealso cref="IServiceBus"/> for the saga instance.
+	//    /// </summary>
+	//    [XmlIgnore]
+	//    public IServiceBus Bus { get; set; }
+
+	//    /// <summary>
+	//    /// Gets the set of trigger conditions that can happen on the saga instance when a message is received.
+	//    /// </summary>
+	//    [XmlIgnore]
+	//    public List<SagaStateMachineDefinedTriggerCondition> TriggerConditions { get; private set; }
+
+	//    /// <summary>
+	//    /// Gets or sets the name for the saga state machine.
+	//    /// </summary>
+	//    public string Name { get; set; }
+
+	//    /// <summary>
+	//    /// Gets or sets the instance identifier for the saga instance.
+	//    /// </summary>
+	//    public Guid InstanceId { get; set; }
+
+	//    /// <summary>
+	//    /// Gets or sets the flag to indicate whether or not the process has completed.
+	//    /// </summary>
+	//    public bool IsCompleted { get; set; }
+
+	//    /// <summary>
+	//    /// Gets or sets the flag to indicate whether or not the process is suspended.
+	//    /// </summary>
+	//    public bool IsSuspended { get; set; }
+
+	//    /// <summary>
+	//    /// Gets or sets the current state of the saga state machine.
+	//    /// </summary>
+	//    public State CurrentState { get; set; }
+
+	//    /// <summary>
+	//    /// Gets or sets the message that the saga is currently consuming.
+	//    /// </summary>
+	//    public ISagaMessage CurrentMessage { get; set; }
+
+	//    /// <summary>
+	//    /// Gets the set of correlations that define how a message should be matched to the current saga instance.
+	//    /// </summary>
+	//    [XmlIgnore]
+	//    public IDictionary<Type, Expression<Func<TData, ISagaMessage, bool>>> Correlations { get; private set; }
+
+	//    protected SagaStateMachine()
+	//        : base()
+	//    {
+	//        this.Data = new TData();
+	//    }
+
+	//    /// <summary>
+	//    /// Gets or sets the data/state associated with the saga state machine.
+	//    /// </summary>
+	//    public TData Data { get; set; }
+
+	//    /// <summary>
+	//    /// This will create an expression used to correlate a message to the saga instance.
+	//    /// </summary>
+	//    /// <example>
+	//    ///  Correlate{MyMessage}( (this, message) => (saga.Data.TransactionId = message.TransactionId));
+	//    /// </example>
+	//    /// <typeparam name="TMessage">Current message type to correlate</typeparam>
+	//    /// <param name="correlation">Expression used to determine if the message can be correlated.</param>
+	//    public void Correlate<TMessage>(Expression<Func<TData, TMessage, bool>> correlation)
+	//        where TMessage : ISagaMessage
+	//    {
+
+	//        if (this.Correlations.ContainsKey(typeof(TMessage)) == false)
+	//        {
+	//            ParameterExpression sagaData = Expression.Parameter(typeof(ISagaData), "data");
+	//            ParameterExpression sagaMessage = Expression.Parameter(typeof(ISagaMessage), "message");
+
+	//            Expression<Func<TData, ISagaMessage, bool>> theCorrelation =
+	//                Expression.Lambda<Func<TData, ISagaMessage, bool>>
+	//                    (correlation.Body,
+	//                     sagaData,
+	//                     sagaMessage
+	//                    );
+				
+	//            this.Correlations.Add(typeof (TMessage), theCorrelation);
+	//        }
+
+	//        // http://www.codeproject.com/KB/silverlight/FixingAllAsync.aspx
+
+	//        /*
+	//         * public void Correlate<MyMessage>(() => data.Id, ()=> message.MessageId); 
+	//         * 
+	//         */
+
+	//    }
+
+
+	//    /// <summary>
+	//    /// This will initialize all of the states on the state machine and set the name 
+	//    /// of the <seealso cref="State"/> to the name of the property defining the 
+	//    /// state.
+	//    /// </summary>
+	//    private void PrepareStatesForStateMachine()
+	//    {
+	//        var properties = (from property in this.GetType().GetProperties()
+	//                          where typeof(State).IsAssignableFrom(property.PropertyType)
+	//                          && property.Name != "CurrentState"
+	//                          select property).Distinct().ToList();
+
+	//        // create the state with the name based on the property:
+	//        foreach (var property in properties)
+	//        {
+	//            var state = new State(property.Name);
+	//            property.SetValue(this, state, null);
+	//        }
+	//    }
+
+	//    private string FindNameForEvent(Type @event)
+	//    {
+	//        string eventName = string.Empty;
+
+	//        var eventProperty = (from property in this.GetType().GetProperties()
+	//                             where property.PropertyType == @event
+	//                             select property).FirstOrDefault();
+
+	//        if (eventProperty != null)
+	//        {
+	//            eventName = eventProperty.Name;
+	//        }
+
+	//        return eventName;
+	//    }
+	//}
+
+}

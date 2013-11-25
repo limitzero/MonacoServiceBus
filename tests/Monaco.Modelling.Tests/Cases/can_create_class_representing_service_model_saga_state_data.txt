@@ -1,0 +1,35 @@
+﻿  using System;
+  using System.Collections.Generic;
+  using System.Text;
+  using Monaco;
+  using Monaco.StateMachines;
+  
+  namespace Monaco.Modelling.ServiceModel
+  {
+      // Persistance data that is kept for each service (implemented as a state machine) from business process model 'AcmeBusinessProcessModel':
+      
+      [Serializable]
+      public class ShippingAnOrderSagaStateMachineData : IStateMachineData
+      {
+          public virtual Guid Id { get; set; }
+          public virtual String State { get; set; }
+          public virtual Int32 Version { get; set; }
+      }
+      
+      [Serializable]
+      public class InvoicingSagaStateMachineData : IStateMachineData
+      {
+          public virtual Guid Id { get; set; }
+          public virtual String State { get; set; }
+          public virtual Int32 Version { get; set; }
+      }
+      
+      [Serializable]
+      public class SchedulingSagaStateMachineData : IStateMachineData
+      {
+          public virtual Guid Id { get; set; }
+          public virtual String State { get; set; }
+          public virtual Int32 Version { get; set; }
+      }
+      
+  }

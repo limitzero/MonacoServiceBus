@@ -1,0 +1,159 @@
+using System;
+using System.Collections.Generic;
+using Monaco.Bus;
+using Monaco.Bus.Internals;
+using Monaco.Bus.MessageManagement.MessageHandling.FaultHandling;
+using Monaco.Configuration;
+using Monaco.Hosting;
+using Monaco.Persistance.Repositories;
+using Monaco.Sagas.StateMachine;
+using Monaco.Tests.Bus.Features.Transports.Msmq;
+using Monaco.Transport;
+using Rhino.Mocks;
+using Rhino.Mocks.Constraints;
+using Xunit;
+
+namespace Monaco.Tests.Sandbox
+{
+	public class TestRemoteAppDomainHost
+	{
+		public void test_apid_for_configuring_remote_app_domain_host()
+		{
+			using (var remoteHost = new RemoteAppDomainHost())
+			{
+				remoteHost.ConfigureWith(c => c.HostAssemblyDirectoryLocationOf(AppDomain.CurrentDomain.BaseDirectory)
+					.HostAssemblyNameOf("Monaco.Tests.dll")
+					.EndpointConfigurationOf<MyEndpointConfiguration>());
+
+				remoteHost.Start();
+			}
+		}
+	}
+
+	public class MsmqMessageFaultHandler : FaultConsumer<MsmqTestMessage>
+	{
+		public IEnvelope Envelope { get; set; }
+		public Exception Exception { get; set; }
+
+		public void Consume(MsmqTestMessage message)
+		{
+			
+		}
+
+		
+	}
+
+	public class MyEndpointConfiguration : BaseEndpointConfiguration
+	{
+		public override void ConfigureEndpoint()
+		{
+				ConfigureFaultHandlers(c=>c.ForMessage<MsmqTestMessage>()
+					.WithHandler<MsmqMessageFaultHandler>());
+		}
+	}
+
+	public class LocalBus
+	{
+		private List<IMessage> _requests;
+		public ITransportMessage CurrentMessage { get; private set; }
+
+		public void Send(Uri endpoint, params IMessage[] messages)
+		{
+
+		}
+
+		public void Send(params  IMessage[] messages)
+		{
+			// enqueue all of the "send" requests and later 
+			// send the reply to the corresponding consumers:
+			this._requests.AddRange(messages);
+		}
+
+		public void Reply(IMessage message)
+		{
+			if (_requests.Contains(this.CurrentMessage.Message))
+			{
+				// dispatch the reply to all consumers:
+				DeliverToComponent(message);
+			}
+		}
+
+		private void DeliverToComponent(IMessage message)
+		{
+
+		}
+	}
+
+	public class TestingSagas
+	{
+		[Fact]
+		public void _can_use_api_to_test_sagas()
+		{
+
+		}
+	}
+
+
+
+	public class SagaScenarios
+	{
+		private MockRepository _mocks;
+
+		public SagaScenarios ExpectToSend<TMessage>(Func<TMessage> action)
+		{
+			TMessage message = action();
+
+
+			LastCall.Constraints(Is.TypeOf<TMessage>())
+				.Repeat.AtLeastOnce();
+
+			return this;
+		}
+
+		public SagaScenarios ExpectToReply<TMessage>(Action<TMessage> action)
+		{
+			return this;
+		}
+
+		public SagaScenarios ExpectSendToEndpoint<TMessage>(Action<TMessage, string> action)
+		{
+
+			return this;
+		}
+
+		public SagaScenarios ExpectToPublish<TMessage>(Action<TMessage> action)
+			where TMessage : IMessage
+		{
+
+			return this;
+		}
+
+		public SagaScenarios ExpectToPublishAll(Action<IEnumerable<IMessage>> action)
+		{
+
+			return this;
+		}
+
+		public SagaScenarios When(Action action)
+		{
+
+			return this;
+		}
+
+
+	}
+
+	public class DispatchingSink
+	{
+		public void Execute(IConsumer consumer, IMessage message)
+		{
+
+		}
+	}
+
+	public interface IPipelineSink<TInput, TOutput>
+	{
+		void Execute();
+	}
+
+}

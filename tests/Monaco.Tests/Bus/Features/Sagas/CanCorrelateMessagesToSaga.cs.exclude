@@ -1,0 +1,294 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using Castle.Windsor;
+using Monaco.Configuration;
+using Monaco.Configuration.Profiles;
+
+using Monaco.Sagas.StateMachine;
+using Monaco.Sagas.StateMachine.Verbalizer;
+using Xunit;
+
+namespace Monaco.Tests.Bus.Features.Sagas
+{
+	public class CorrelatedSagaEndpointConfig : BaseEndpointConfiguration, IClientProfile
+	{
+		public override void ConfigureEndpoint()
+		{
+			//MapMessages<SagaCorrelatedMessageTests.CorrelatingSaga>();
+			MapMessages<SagaCorrelatedMessageTests.CorrelatingSagaStateMachine>();
+		}
+	}
+
+	public class SagaCorrelatedMessageTests : IDisposable
+	{
+		public static Guid _sagaId;
+		public static Guid _correlationId;
+		public static List<object> _received_messages;
+		public static ManualResetEvent _wait;
+		private IWindsorContainer _container;
+
+		public SagaCorrelatedMessageTests()
+		{
+			_container = new MonacoContainer(@"sample.config");
+			_wait = new ManualResetEvent(false);
+			_received_messages = new List<object>();
+			_sagaId = Guid.Empty;
+			_correlationId = Guid.NewGuid();
+
+			var verbalizer = new SagaStateMachineVerbalizer();
+			var results = verbalizer.Verbalize<CorrelatingSagaStateMachine>();
+			System.Diagnostics.Debug.WriteLine(results);
+		}
+
+		public void Dispose()
+		{
+			_container.Dispose();
+			_container = null;
+
+			_received_messages = null;
+
+			if (_wait != null)
+			{
+				_wait.Close();
+				_wait = null;
+			}
+		}
+
+		[Fact]
+		public void can_create_correlation_for_message_and_resolve_by_message_type()
+		{
+			var saga = new CorrelatingSagaStateMachine(); //new CorrelatingSaga();
+			//saga.Define();
+
+			var correlation = saga.Correlations[typeof(NonCorrelatedMessage)];
+
+			Assert.NotNull(correlation);
+		}
+
+		[Fact]
+		public void can_dispatch_message_for_correlation_to_saga_and_push_noncorrelated_message_to_error_endpoint()
+		{
+			using (var bus = _container.Resolve<IServiceBus>())
+			{
+				bus.ConfiguredWithEndpoint<CorrelatedSagaEndpointConfig>();
+
+				bus.Start();
+
+				bus.Publish(new CorrelatingStartMessage { MessageId = 100 });
+				_wait.WaitOne(TimeSpan.FromSeconds(5));
+				Assert.True(IsMessageReceived<CorrelatingStartMessage>());
+				_wait.Reset();
+
+				bus.Publish(new CorrelatingMessage1 { CorrelationId = _correlationId });
+				_wait.WaitOne(TimeSpan.FromSeconds(5));
+				Assert.True(IsMessageReceived<CorrelatingMessage1>());
+				_wait.Reset();
+
+				bus.Publish(new CorrelatingMessage2 { CorrelationId = _correlationId });
+				_wait.WaitOne(TimeSpan.FromSeconds(5));
+				Assert.True(IsMessageReceived<CorrelatingMessage2>());
+				_wait.Reset();
+
+				// here is the non-correlated message to the saga (was not received):
+				bus.Publish(new NonCorrelatedMessage { MessageId = int.MaxValue - 1 });
+				_wait.WaitOne(TimeSpan.FromSeconds(5));
+				Assert.False(IsMessageReceived<NonCorrelatedMessage>());
+				_wait.Reset();
+			}
+		}
+
+		private static bool IsMessageReceived<TMESSAGE>() where TMESSAGE : class
+		{
+			if (_received_messages == null) throw new Exception("received messages collection is null");
+			return _received_messages.Exists(x => x.GetType() == typeof(TMESSAGE));
+		}
+
+		public class CorrelatingMessage1 : IMessage
+		{
+			public Guid CorrelationId { get; set; }
+		}
+
+		public class CorrelatingMessage2 : IMessage
+		{
+			public Guid CorrelationId { get; set; }
+		}
+
+		public class CorrelatingSagaStateMachine :
+			SagaStateMachine, 
+			ISagaStateMachineData<CorrelatingSagaData>,
+			StartedBy<CorrelatingStartMessage>,
+			OrchestratedBy<CorrelatingMessage1>,
+			OrchestratedBy<CorrelatingMessage2>,
+			OrchestratedBy<NonCorrelatedMessage>
+		{
+			public CorrelatingSagaData Data { get; set; }
+
+			public Event<CorrelatingStartMessage> Started { get; set; }
+			public Event<CorrelatingMessage1> SecondCorrelatedMessageReceived { get; set; }
+			public Event<CorrelatingMessage2> ThirdCorrelatedMessageReceived { get; set; }
+			public Event<NonCorrelatedMessage> NonCorrelatedMessageReceived { get; set; }
+
+			public State LookingForSecondCorrelatedMessage { get; set; }
+			public State LookingForThirdCorrelatedMessage { get; set; }
+			public State LookingForNonCorrelatedMessage { get; set; }
+
+			public CorrelatingSagaStateMachine()
+			{
+				//Correlate<CorrelatingMessage1>(c => c.CorrelationId == Data.MessageId);
+				//Correlate<CorrelatingMessage2>(c => c.CorrelationId == Data.MessageId);
+
+				// failing case:
+				Correlate<NonCorrelatedMessage>(c => c.MessageId == Data.AlternateMessageId);	
+			}
+
+			public void Consume(CorrelatingStartMessage message)
+			{
+
+			}
+
+			public void Consume(CorrelatingMessage1 message)
+			{
+
+			}
+
+			public void Consume(CorrelatingMessage2 message)
+			{
+
+			}
+
+			public void Consume(NonCorrelatedMessage message)
+			{
+
+			}
+
+			public override void Define()
+			{
+				// these messages should have the same message id to correlation id value
+				// for a given conversation (this is how we find the saga instance as well):
+				//Correlate<CorrelatingMessage1>(c => c.CorrelationId.ToString() == Data.CorrelationId));
+				//Correlate<CorrelatingMessage2>(c => c.CorrelationId == State.MessageId);
+
+				// failing case (can find the saga with the persistant state, but the correlations do not match):
+				//Correlate<NonCorrelatedMessage>(c => c.MessageId == State.AlternateMessageId);
+
+				Initially(
+					When(Started)
+					.Do(() =>
+						{
+							// NOTE: must cast to specific message in order to inspect...yuck!!!
+							var message = this.CurrentMessage as CorrelatingStartMessage;
+
+							// here is how we correlate for the start message...
+							// State.MessageId = message.MessageId;
+
+							_received_messages.Add(message);
+							_wait.Set();
+						})
+						.TransitionTo(LookingForSecondCorrelatedMessage)
+					);
+
+				While(LookingForSecondCorrelatedMessage,
+					 When(SecondCorrelatedMessageReceived)
+					 .Do(() =>
+							{
+								_received_messages.Add(this.CurrentMessage);
+								_wait.Set();
+							})
+					 .TransitionTo(LookingForThirdCorrelatedMessage)
+					);
+
+				While(LookingForThirdCorrelatedMessage,
+					 When(ThirdCorrelatedMessageReceived)
+					 .Do(() =>
+					 {
+						 _received_messages.Add(this.CurrentMessage);
+						 _wait.Set();
+					 })
+					 .TransitionTo(LookingForNonCorrelatedMessage)
+				);
+
+				While(LookingForNonCorrelatedMessage,
+					 When(NonCorrelatedMessageReceived)
+					 .Do(() =>
+					 {
+						 _received_messages.Add(this.CurrentMessage);
+						 _wait.Set();
+					 })
+					.Complete()
+					);
+
+			}
+
+
+		}
+
+		public class CorrelatingSaga :
+			Saga<CorrelatingSagaData>,
+			StartedBy<CorrelatingStartMessage>,
+			OrchestratedBy<CorrelatingMessage1>,
+			OrchestratedBy<CorrelatingMessage2>,
+			OrchestratedBy<NonCorrelatedMessage>
+		{
+			public CorrelatingSaga()
+			{
+				//Correlate<CorrelatingMessage1>(c => c.CorrelationId == Data.MessageId);
+				//Correlate<CorrelatingMessage2>(c => c.CorrelationId == Data.MessageId);
+
+				// failing case:
+				Correlate<NonCorrelatedMessage>(c => c.MessageId == Data.AlternateMessageId);
+			}
+
+			public void Consume(CorrelatingStartMessage message)
+			{
+				//set the message id for correlation:
+				Data.MessageId = message.MessageId;
+
+				_received_messages.Add(message);
+				_wait.Set();
+			}
+
+			public void Consume(CorrelatingMessage1 message)
+			{
+				_received_messages.Add(message);
+				_wait.Set();
+			}
+
+			public void Consume(CorrelatingMessage2 message)
+			{
+				_received_messages.Add(message);
+				_wait.Set();
+			}
+
+			public void Consume(NonCorrelatedMessage message)
+			{
+				_received_messages.Add(message);
+				_wait.Set();
+			}
+		}
+
+		[Serializable]
+		public class CorrelatingSagaData : ISagaData
+		{
+			public int MessageId { get; set; }
+			public int AlternateMessageId { get; set; }
+			public virtual Guid CorrelationId { get; set; }
+			public string State { get; set; }
+		}
+
+		[Serializable]
+		public class CorrelatingStartMessage : IMessage
+		{
+			public Guid CorrelationId { get; set; }
+			public int MessageId { get; set; }
+		}
+
+		[Serializable]
+		public class NonCorrelatedMessage : IMessage
+		{
+			public Guid CorrelationId { get; set; }
+			public int MessageId { get; set; }
+		}
+
+	}
+}

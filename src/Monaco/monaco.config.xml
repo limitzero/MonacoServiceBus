@@ -1,0 +1,86 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+
+<!-- example of full configuration -->
+<configuration>
+
+	<components>
+		<!--
+    <component id="my.ping.task"
+               service="MyService.Tasks.PingTask, MyService" />
+               
+     <component id="my.consumer"
+               service="MyService.Consumers.MyConsumer, MyService" />
+               
+      <component id="my.pipeline"
+               service="MyService.Pipelines.MyPipeline, MyService" />
+     -->
+	</components>
+
+	<facilities>
+
+		<facility id="monaco">
+
+			<!-- configuration of message bus  -->
+			<message-bus>
+				<endpoint uri="vm://monaco.esb" concurrency="1" max-retries="2" status-interval="00:00:20" status-interval-grace-period="00:00:05" />
+			</message-bus>
+
+			<!--  listing of the assemblies that contain the messages -->
+			<messages>
+				<add name="Monaco.Tests" />
+			</messages>
+
+			<!-- {your custom transport or storage configuration here}-->
+			
+			<!-- listing of all the named endpoints on the message bus (some of the sample transports listed below) -->
+			<endpoints>
+				<endpoint name="my.endpoint.vm" uri="vm://endpoint.vm" concurrency="1" frequency="3" interval="00:00:05" max-retries="2" status-interval="00:00:20" status-interval-grace-period="00:00:05" />
+				<endpoint name="my.endpoint.msmq" uri="msmq://localhost/myQueue" concurrency="1" frequency="3" interval="00:00:05" max-retries="2" status-interval="00:00:20" status-interval-grace-period="00:00:05" />
+				<endpoint name="my.endpoint.file" uri="file://c:\temp" concurrency="1" frequency="3" interval="00:00:05" max-retries="2" status-interval="00:00:20" status-interval-grace-period="00:00:05" />
+			</endpoints>
+
+			<!-- example of service to communicate over MSMQ endpoint and process messages -->
+			<service name="my first service">
+				<implementation>
+					<add ref="my.consumer" />
+				</implementation>
+				<pipeline ref="my.pipeline" />
+				<!-- (1) can declare full endpoint semantics -->
+				<endpoint uri="msmq://localhost/first.service" concurrency="1" max-retries="2" status-interval="00:00:02" status-interval-grace-period="00:00:05" />
+				<!-- (2) or just refer to a named endpoint instance -->
+				<endpoint ref="my.endpoint.msmq" />
+			</service>
+
+			<!-- listing of the user-specified scheduled tasks that occur on the message bus -->
+			<tasks>
+				<!-- (1) reference to task in components declaration -->
+				<add ref="my.ping.task" name="Ping Task" method="Execute" interval="00:00:01" haltOnError="true" forceStart="true" />
+				<!-- (2) or reference to task by loading type declaration -->
+				<add type="MyService.Tasks.PingTask, MyService" name="Ping Task" method="Execute" interval="00:00:01" haltOnError="true" forceStart="true" />
+			</tasks>
+
+			<!-- persistant storage section for subscriptions, sagas and other extensible points (if using server or console profile, this must be provided) -->
+			<storage>
+				<subscriptions provider="Monaco.NHibernate.Storage.Subscriptions.NHibernateSubscriptionRepository, Monaco.NHibernate.Storage" />
+				<sagas provider="Monaco.NHibernate.Storage.Sagas.NHibernateSagaRepository, Monaco.NHibernate.Storage" />
+				<saga-data provider="Monaco.NHibernate.Storage.Sagas.NHibernateSagaDataRepository, Monaco.NHibernate.Storage" />
+				<timeouts provider="Monaco.NHibernate.Storage.Timeouts.NHibernateTimeoutsRepository, Monaco.NHibernate.Storage" />
+			</storage>
+			
+			<!-- name of the control bus where the status messages will be sent (optional) -->
+			<control-bus uri="msmq://localhost/monaco.esb.control" />
+
+			<!-- the subscription manager is the dedicated endpoint reserved for pub/sub implementations -->
+			<subscription-manager uri="msmq://localhost/monaco.subscriptions" />
+
+			<!-- the endpoint manager will broadcast information about the 
+              service endpoints on a given interval and optionally recycle the 
+              endpoint statistics calculation on a given interval -->
+			<endpoint-service-manager broadcast-status-interval="00:01:00" recycle-statistics-interval="00:05:00" />
+
+
+		</facility>
+
+	</facilities>
+
+</configuration>

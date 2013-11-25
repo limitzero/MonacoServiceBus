@@ -1,0 +1,22 @@
+﻿-- not really sure on what I was thinking here, maybe I wanted to keep the bus api all server side 
+-- and use WCF on the client side (WCF as a Gateway to the bus...)
+
+<castle>
+	<facilities>
+
+		<facility id="monaco.wcf">
+			<endpoints>
+			  <endpoint ref="my.service" uri="http://localhost:9001/MyService" binding="wsHttp | basicHttp | netTcp" />
+			  <endpoint contract="Monaco.WCF.Integration.IMyService" service="Monaco.WCF.Integration.MyService" 
+				uri="http://localhost:9001/MyService" binding="wsHttp | basicHttp | netTcp" />
+			</endpoints>
+		</facility>
+		
+	</facilities>
+
+	<components>
+		<component id="my.service" type="Monaco.WCF.Integration.IMyService"
+		  service="Monaco.WCF.Integration.MyService" />
+	</components>
+
+</castle>

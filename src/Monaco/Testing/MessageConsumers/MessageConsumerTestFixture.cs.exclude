@@ -1,0 +1,101 @@
+using System;
+using Castle.MicroKernel;
+using Castle.MicroKernel.Registration;
+using Monaco.Bus;
+using Monaco.Bus.Internals;
+using Monaco.Bus.MessageManagement.MessageHandling.Dispatching.ToConsumer;
+using Monaco.Infrastructure.Logging;
+using Monaco.Infrastructure.Logging.Impl;
+using Rhino.Mocks;
+
+namespace Monaco.Testing.MessageConsumers
+{
+	/// <summary>
+	/// Base test fixture for testing implementations of <seealso cref="MessageConsumer"/> or 
+	/// <seealso cref="MessageConsumer{TData}"/>.
+	/// </summary>
+	public abstract class MessageConsumerTestFixture : IDisposable
+	{
+		private MockRepository _mocks = null;
+		private IMessage _message; 
+
+		// collaborators:
+		private IKernel _kernel;
+		private IServiceBus _messageBus;
+
+		// subject under test:
+		private MessageConsumer _consumer;
+
+		public void Dispose()
+		{
+			if (_kernel != null)
+				_kernel.Dispose();
+
+			_kernel = null;
+			_mocks = null;
+			_consumer = null;
+			_messageBus = null;
+		}
+
+		protected TMessageConsumer PrepareConsumer<TMessageConsumer>()
+			where TMessageConsumer : MessageConsumer
+		{
+			_mocks = new MockRepository();
+			
+			// collaborators (need this for component logging):
+			_kernel = new DefaultKernel();
+
+			_kernel.Register(Component.For<ILogger>()
+				.ImplementedBy<ConsoleLogger>());
+			_kernel.Register(Component.For<ISimpleConsumerMessageDispatcher>()
+				.ImplementedBy<SimpleConsumerMessageDispatcher>());
+
+			_messageBus = _mocks.DynamicMock<IServiceBus>();
+
+			// subject under test:
+			_kernel.Register(Component.For<TMessageConsumer>());
+			_consumer = _kernel.Resolve<TMessageConsumer>();
+
+			return _consumer as TMessageConsumer;
+		}
+
+
+		protected void ForConsumer<TMessage>(MessageConsumerUnitTestExpectation<TMessage> expectation)
+			where TMessage : IMessage
+		{
+			using (_mocks.Record())
+			{
+				this._consumer.Bus = this._messageBus;
+
+				// check assertions:
+				foreach (var action in expectation.Actions)
+					action();
+			}
+
+			using (_mocks.Playback())
+			{
+				// consume the message:
+				this.Consume(this._message);
+			}
+
+			_mocks.BackToRecordAll();
+		}
+
+		protected MessageConsumerUnitTestExpectation<TMessage> UponReceiving<TMessage>(Action<TMessage> action)
+			where TMessage : class, IMessage, new()
+		{
+			var message = new TMessage();
+			action(message);
+
+			this._message = message;
+
+			return new MessageConsumerUnitTestExpectation<TMessage>(_message as TMessage, _messageBus);
+		}
+
+		private void Consume(IMessage message)
+		{
+			var dispatcher = _kernel.Resolve<ISimpleConsumerMessageDispatcher>(); 
+			dispatcher.Dispatch(_messageBus, _consumer as IConsumer,  new Envelope(message));
+		}
+	}
+}

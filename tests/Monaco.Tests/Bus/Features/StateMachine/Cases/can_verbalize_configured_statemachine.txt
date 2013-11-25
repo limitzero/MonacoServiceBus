@@ -1,0 +1,13 @@
+﻿Configuration for saga state machine : The Test Saga!!
+======================================================
+Initially when the 'TestStartMessage' message arrives, it will 
+publish the message 'TestStartMessage' 
+send the message 'TestStartedMessage' to endpoint 'msmq://localhost/my.queue'
+delay publishing of the message 'TestStartedMessage' by '0' days, '0' hours, '0' minutes, and '5' seconds
+execute some custom code
+then transition to state 'WaitingForSecondMessage' 
+  
+While in state 'WaitingForSecondMessage', when the 'TestStartedMessage' message arrives, it will 
+publish the message 'TestStartedMessage' 
+reply with the message 'TestStartMessage' 
+then complete

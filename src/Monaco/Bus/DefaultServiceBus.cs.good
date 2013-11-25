@@ -1,0 +1,1692 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using Castle.DynamicProxy;
+using Castle.MicroKernel;
+using Monaco.Bus.Agents.Scheduler;
+using Monaco.Bus.Internals;
+using Monaco.Bus.Internals.Collections;
+using Monaco.Bus.Internals.Eventing;
+using Monaco.Bus.Internals.Reflection;
+using Monaco.Bus.MessageManagement.Callbacks;
+using Monaco.Bus.MessageManagement.MessageHandling.Dispatching.ToConsumer;
+using Monaco.Bus.MessageManagement.MessageHandling.Dispatching.ToStateMachine;
+using Monaco.Bus.MessageManagement.MessageHandling.FaultHandling;
+using Monaco.Bus.MessageManagement.MessageHandling.FaultHandling.Impl;
+using Monaco.Bus.MessageManagement.Serialization;
+using Monaco.Bus.Messages;
+using Monaco.Bus.Messages.For.Faults;
+using Monaco.Bus.Messages.For.Publications;
+using Monaco.Bus.Messages.For.Subscriptions;
+using Monaco.Bus.Repositories;
+using Monaco.Configuration;
+using Monaco.Endpoint;
+using Monaco.Endpoint.Factory;
+using Monaco.Endpoint.Impl.Control;
+using Monaco.Exceptions;
+using Monaco.Extensions;
+using Monaco.Infrastructure.Logging;
+using Monaco.Persistance.Repositories;
+using Monaco.Sagas;
+using Monaco.Sagas.StateMachine;
+using Monaco.Services.HealthMonitoring.Messages.Events;
+using Monaco.Services.Timeout;
+using Monaco.Services.Timeout.Messages.Commands;
+using Monaco.Subscriptions;
+using Monaco.Testing.StateMachines;
+using Monaco.Transport;
+
+namespace Monaco.Bus
+{
+	public class DefaultServiceBus : IServiceBus
+	{
+		private const int MessageBatchSize = 256;
+		private static readonly object _endpoint_lock = new object();
+		private static readonly object _request_lock = new object();
+
+		private readonly IKernel _kernel;
+		private readonly IScheduler _scheduler;
+		private readonly ISubscriptionRepository _subscriptionRepository;
+		private bool _disposed;
+		private ITransport _transport;
+		private IThreadSafeList<IMessage> _requests;
+		private ITimeoutsService _timeoutAgent;
+		private IThreadSafeList<IDisposableAction> _tokens;
+		private IThreadSafeDictionary<Type, List<IConsumer>> _typedHandlersCache;
+
+		public event EventHandler<ComponentNotificationEventArgs> ComponentNotificationEvent;
+
+		public event EventHandler<ComponentErrorEventArgs> ComponentErrorEvent;
+
+		public IEnvelope CurrentEnvelope { get; private set; }
+
+		public IEndpoint Endpoint { get;  set;}
+
+		public DefaultServiceBus(IKernel kernel,
+								 ITransport transport,
+								 IScheduler scheduler,
+								 ISubscriptionRepository subscriptionRepository)
+		{
+			_kernel = kernel;
+			_scheduler = scheduler;
+			_transport = transport;
+			_subscriptionRepository = subscriptionRepository;
+			_typedHandlersCache = new ThreadSafeDictionary<Type, List<IConsumer>>();
+			_requests = new ThreadSafeList<IMessage>();
+			_tokens = new ThreadSafeList<IDisposableAction>();
+			this.Endpoint = transport.Endpoint;
+		}
+
+		public Action<string> OnStart { get; set; }
+
+		public Action<string> OnStop { get; set; }
+
+		public bool IsRunning { get; private set; }
+
+		public TComponent Find<TComponent>()
+		{
+			TComponent theComponent = default(TComponent);
+
+			if (_disposed) return theComponent;
+
+			object aComponent = Find(typeof(TComponent));
+
+			if (aComponent != null)
+			{
+				theComponent = (TComponent)aComponent;
+			}
+
+			return theComponent;
+		}
+
+		public object Find(Type component)
+		{
+			object theComponent = null;
+
+			if (_disposed) return null;
+
+			try
+			{
+				theComponent = _kernel.Resolve(component);
+			}
+			catch (Exception exception)
+			{
+				throw CouldNotResolveComponentException(component, exception);
+			}
+
+			return theComponent;
+		}
+
+		public ICollection<TComponent> FindAll<TComponent>()
+		{
+			ICollection<TComponent> components = new List<TComponent>();
+
+			if (_disposed) return null;
+
+			try
+			{
+				TComponent[] theComponents = _kernel.ResolveAll<TComponent>();
+
+				foreach (TComponent component in theComponents)
+				{
+					components.Add(component);
+				}
+			}
+			catch (Exception exception)
+			{
+				throw CouldNotResolveAllImplementationsFromComponentException(typeof(TComponent), exception);
+			}
+
+			return components;
+		}
+
+		public TMessage CreateMessage<TMessage>() 
+		{
+			TMessage theMessage = default(TMessage);
+
+			if (_disposed) return theMessage;
+
+			if (typeof(TMessage).IsInterface == false || !typeof(IMessage).IsAssignableFrom(typeof(TMessage)))
+			{
+				throw MessageToCreateNotImplementedAsInterfaceException(typeof(TMessage));
+			}
+
+			// create the proxy for the interface:
+			var interfaceStorage = new InterfacePersistance();
+			var interceptor = new InterfaceInterceptor(interfaceStorage);
+
+			var proxyGenerator = new ProxyGenerator();
+			var proxy = proxyGenerator.CreateInterfaceProxyWithoutTarget(typeof(TMessage), interceptor);
+
+			return (TMessage)proxy;
+		}
+
+		public IControlEndpoint GetControlEndpoint()
+		{
+			IControlEndpoint controlEndpoint = null;
+
+			try
+			{
+				controlEndpoint = _kernel.Resolve<IControlEndpoint>();
+
+				if (controlEndpoint != null)
+				{
+					// make sure that the local endpoint is not the control:
+					if (controlEndpoint.Uri != this._transport.Endpoint.EndpointUri.OriginalString) 
+						return controlEndpoint;
+				}
+			}
+			catch
+			{
+				// no control endpoint found...do nothing:	
+			}
+
+			return controlEndpoint;
+		}
+
+		public void ConsumeMessages(params IMessage[] messages)
+		{
+			this.SendInternal(messages);
+		}
+
+		public IDisposableAction Subscribe<TMessage>() where TMessage : IMessage
+		{
+			return this.Subscribe(typeof(TMessage));
+		}
+
+		public void Publish<TMessage>() where  TMessage : IMessage
+		{
+			var toPublish = this.CreateMessage<TMessage>();
+			this.Publish(toPublish);
+		}
+
+		public void Publish<TMessage>(Action<TMessage> action)
+			where TMessage : class, IMessage, new()
+		{
+			var message = new TMessage();
+
+			if (action != null)
+				action(message);
+
+			Publish(message);
+		}
+
+		public void Publish(IMessage message)
+		{
+			var messages = new object[] {message};
+			this.Publish(messages);
+		}
+
+		public void Publish(params object[] messages)
+		{
+			if (_disposed) return;
+
+			if (messages.Length > MessageBatchSize)
+			{
+				throw new MessageBatchExceededException();
+			}
+
+			var messagesToPublish = new List<object>();
+
+			var nonSubscriptionDefinedMessages = new List<object>();
+
+			IControlEndpoint control = GetControlEndpoint();
+
+			foreach (IMessage message in messages)
+			{
+				if (FindAllSubscriptionsForMessage(message).Count == 0)
+				{
+					if (control == null && typeof(IAdminMessage).IsAssignableFrom(message.GetType())) continue;
+					nonSubscriptionDefinedMessages.Add(message);
+				}
+			}
+
+			if (nonSubscriptionDefinedMessages.Count > 0)
+			{
+				// do not throw an error here as other messages in the batch may be ok:
+				NoSubscriptionsRegisteredForMessagesPublicationException(nonSubscriptionDefinedMessages);
+
+				if (control == null)
+				{
+					InvokeFaultHandlerForNonPublishableMessages(nonSubscriptionDefinedMessages);
+				}
+				else
+				{
+					foreach (IMessage nonSubscriptionDefinedMessage in nonSubscriptionDefinedMessages)
+					{
+						ForwardMessagesToControlEndpoint(
+							new PublishMessage
+								{
+									Message = nonSubscriptionDefinedMessage,
+									Endpoint = this._transport.Endpoint.EndpointUri.OriginalString
+								});
+					}
+				}
+
+				messagesToPublish = (from message in messages
+									 where nonSubscriptionDefinedMessages.Contains(message) == false
+									 select message).ToList();
+			}
+			else
+			{
+				messagesToPublish.AddRange(messages);
+			}
+
+			this.PublishInternal(messagesToPublish.ToArray());
+		}
+
+		public void Notify<TMessage>(Action<TMessage> action)
+			where TMessage: class , IMessage, new()
+		{
+			var message = new TMessage();
+			action(message);
+			this.Notify(new object[] {message});
+		}
+
+		public void Notify(params object[] messages)
+		{
+			foreach (var message in messages)
+			{
+				var subscriptions = this.FindAllSubscriptionsForMessage(message);
+
+				if(subscriptions.Count == 0) continue;
+
+				PublishInternal(message);
+			}
+		}
+
+		public ICallback Send<TMessage>() where TMessage : IMessage
+		{
+			var toSend = this.CreateMessage<TMessage>();
+			return this.Send(toSend);
+		}
+
+		public ICallback Send(params object[] messages)
+		{
+			var callback = this.Find<ICallback>();
+
+			if (_disposed) return null;
+
+			foreach (IMessage message in messages)
+				this.EnqueueRequestForPossibleReply(message);
+
+			foreach (IMessage message in messages)
+				this.SendInternal(message);
+
+			return callback;
+		}
+
+		public ICallback Send<TMessage>(Action<TMessage> action)
+			where TMessage : class, IMessage, new()
+		{
+			if (_disposed) return null;
+
+			var message = new TMessage();
+			action(message);
+
+			return this.Send(message);
+		}
+
+		public ICallback Send(IMessage message)
+		{
+			var messages = new List<IMessage> { message };
+			return this.Send(messages.ToArray());
+		}
+
+		public ICallback Send(Uri endpoint, params object[] messages)
+		{
+			if (_disposed) return null;
+
+			var callback = this.Find<ICallback>();
+
+			GuardOnBatchLimit(messages);
+
+			foreach (IMessage message in messages)
+			{
+				var envelope = new Envelope();
+				envelope.Header.LocalEndpoint = _transport.Endpoint.EndpointUri.ToString();
+				envelope.Header.RemoteEndpoint = endpoint.ToString();
+				envelope.Header.ReplyEndpoint = _transport.Endpoint.EndpointUri.ToString();
+				envelope.Body.Payload = message;
+
+				if (this._transport.Endpoint.EndpointUri.OriginalString != endpoint.OriginalString)
+					envelope.Header.RecordStage(this, message, "Send(Remote)");
+
+				DispatchMessageViaTransport(endpoint, envelope); 
+			}
+
+			return callback;
+		}
+
+		public void Reply<TMessage>(Action<TMessage> action)
+			where TMessage : class, IMessage, new()
+		{
+			var message = new TMessage();
+			action(message);
+			this.Reply(message);
+		}
+
+		public void Reply(object message)
+		{
+			if (_disposed) return;
+
+			// make sure the reply is correlated to a request before completing the cycle
+			// (an internal callback is registered for every "Send" operation):
+			var repository = this.Find<ICallBackRepository>();
+			var callback = repository.Correlate(this.CurrentEnvelope.Body.Payload, message);
+
+			// make sure the callback is executed (if one is configured for the message response):
+			if (callback != null)
+			{
+				try
+				{
+					callback.Complete(message);
+				}
+				catch (Exception ex)
+				{
+					var notificationEventArgs = new ComponentNotificationEventArgs(NotificationLevel.Warn,
+						string.Format(
+						"Error completing call back for request '{0}' with reply '{1}'. Reason: {2} , Stack Trace : {3} ",
+						callback.ResponseMessage.GetType().Name,
+						message.GetType().Name,
+						ex.Message,
+						ex.StackTrace));
+					OnBusNotification(notificationEventArgs);
+				}
+				finally
+				{
+					if (callback.AsyncRequest != null)
+						repository.UnRegister(callback);
+				}
+			}
+			else
+			{
+				// send the reply back to all interested parties (only if the async callback is not registered):
+				if (this.CurrentEnvelope != null)
+				{
+					this.Send(this.CurrentEnvelope.Header.ReplyEndpoint.ToUri(), message);
+				}
+			}
+		}
+
+		/// <summary>
+		/// This will add a one-time instance consumer w/subscription 
+		/// to the service bus and will be enlisted in the global set 
+		/// of consumer to message subscriptions. Also, the consumer 
+		/// must inherit from <seealso cref="TransientConsumerOf{T}"/>
+		/// to participate in the instance subscription and can be unregistered
+		/// by calling the Dispose method.
+		/// </summary>
+		/// <typeparam name="TConsumer">Type of the consumer for transient message consumption.</typeparam>
+		/// <returns>
+		/// A <seealso cref="IDisposableAction"/> that can be called to remove the temporary registration.
+		/// </returns>
+		public IDisposableAction AddInstanceConsumer<TConsumer>() where TConsumer : IConsumer
+		{
+			if (_disposed) return null;
+
+			IDisposableAction token = CreateInstanceConsumerWithSubscriptions(typeof(TConsumer));
+			_tokens.Add(token);
+
+			return token;
+		}
+
+		/// <summary>
+		/// This will add a one-time instance consumer w/subscription 
+		/// to the service bus and will be enlisted in the global set 
+		/// of consumer to message subscriptions. Also, the consumer 
+		/// must inherit from <seealso cref="TransientConsumerOf{T}"/>
+		/// to participate in the instance subscription and can be unregistered
+		/// by calling the Dispose method.
+		/// </summary>
+		/// <param name="instance">The current instance of the instance subscription.</param>
+		/// <returns>
+		/// A <seealso cref="IDisposableAction"/> that can be called to remove the temporary registration.
+		/// </returns>
+		public IDisposableAction AddInstanceConsumer(object instance)
+		{
+			if (_disposed) return null;
+
+			IDisposableAction token = CreateInstanceConsumerWithSubscriptions(instance.GetType());
+			_tokens.Add(token);
+
+			return token;
+		}
+
+		/// <summary>
+		/// This will enqueue a request to be sent using the BeginXXX/EndXXX pattern for managing
+		/// the <seealso cref="IAsyncResult"/> object or to manage a semi-sychronous request reply 
+		/// scenario where the calling code needs to directly get the response to a request.
+		/// </summary>
+		/// <returns></returns>
+		public IServiceAsyncRequest EnqueueRequest()
+		{
+			return new ServiceBusAsyncRequestResult(this);
+		}
+
+		/// <summary>
+		/// This will forcibly complete an asynchrous request to the service bus and return a message (if necessary)
+		/// </summary>
+		/// <typeparam name="TMessage">Requested message to be responded to asynchronously</typeparam>
+		/// <param name="response"></param>
+		public void CompleteAsyncRequestFor<TMessage>(IMessage response)
+			where TMessage : class, IMessage, new()
+		{
+			var callbackRepository = this.Find<ICallBackRepository>();
+
+			if (callbackRepository == null) return;
+
+			var callback = callbackRepository.Correlate(new TMessage(), response);
+
+			if (callback == null) return;
+
+			callback.Complete(response);
+
+			callbackRepository.UnRegister(callback);
+		}
+
+		/// <summary>
+		/// This will enqueue a message for the bus to handle at a later time.
+		/// </summary>
+		/// <param name="delay">Amount of time to delay handling of the mesasge</param>
+		/// <param name="message">Message to delay delivery</param>
+		public void HandleMessageLater(TimeSpan delay, IMessage message)
+		{
+			PublishInternal(new ScheduleTimeout(delay, message)
+			             	{
+			             		Endpoint = this._transport.Endpoint.EndpointUri.OriginalString
+			             	});
+		}
+
+		/// <summary>
+		/// This will configure the service bus according to the defined components and semantics of the endpoint configuration.
+		/// </summary>
+		/// <typeparam name="TEndpointConfiguration">Type corresponding to the endpoint configuration for the service bus.</typeparam>
+		public void ConfiguredWithEndpoint<TEndpointConfiguration>()
+			where TEndpointConfiguration : BaseEndpointConfiguration, new()
+		{
+			var endpointConfiguration = new TEndpointConfiguration();
+			ConfiguredWithEndpoint(endpointConfiguration.GetType());
+		}
+
+		/// <summary>
+		/// This will configure the service bus according to the defined components and semantics of the endpoint configuration.
+		/// </summary>
+		/// <param name="endpointConfigurationType">Type corresponding to the endpoint configuration for the service bus.</param>
+		public void ConfiguredWithEndpoint(Type endpointConfigurationType)
+		{
+			if (typeof(BaseEndpointConfiguration).IsAssignableFrom(endpointConfigurationType) == false)
+			{
+				OnComponentNotification(this, new ComponentNotificationEventArgs(NotificationLevel.Warn,
+																				 string.Format(
+																					"The endpoint configuration of '{0}' was derived from '{1}." +
+																					"All resources registered for this configuration WILL NOT participate on the message bus.",
+																					endpointConfigurationType.FullName,
+																					typeof(BaseEndpointConfiguration).FullName)));
+				return;
+			}
+
+			var reflection = Find<IReflection>();
+			var endpointConfiguration = reflection.BuildInstance(endpointConfigurationType) as BaseEndpointConfiguration;
+
+			if (endpointConfiguration.IsActive == false)
+			{
+				OnComponentNotification(this, new ComponentNotificationEventArgs(NotificationLevel.Warn,
+																				 string.Format(
+																					"The endpoint configuration of '{0}' was specified but marked as inactive. " +
+																					"All resources registered for this configure WILL NOT participate on the message bus.",
+																					endpointConfigurationType.FullName)));
+				return;
+			}
+
+			try
+			{
+				endpointConfiguration.Kernel = _kernel;
+				endpointConfiguration.Configure();
+
+				OnComponentNotification(this, new ComponentNotificationEventArgs(NotificationLevel.Info,
+																				 string.Format(
+																					"The endpoint configuration of '{0}' was configured on the service bus at [{1}].",
+																					endpointConfigurationType.FullName,
+																					this._transport.Endpoint.EndpointUri.ToString())));
+			}
+			catch (Exception exception)
+			{
+				OnComponentNotification(this,
+										new ComponentNotificationEventArgs(NotificationLevel.Warn,
+																		   string.Format(
+																			"An error has occurred while attempting to use the endpoint configuration '{0}', " +
+																			"no components for this configuration will be used. Reason: {1}",
+																			endpointConfigurationType.FullName,
+																			exception)));
+				throw;
+			}
+		}
+
+		public void Start()
+		{
+			try
+			{
+				Initialize();
+			}
+			catch (Exception exception)
+			{
+				// throw and log the error and clean-up any initial state:
+				Terminate(false, true);
+				throw CouldNotStartMessageBusException(exception);
+			}
+		}
+
+		public void Stop()
+		{
+			if (IsRunning == false) return;
+			Dispose();
+		}
+
+		public void Dispose()
+		{
+			Dispose(true);
+			GC.SuppressFinalize(this);
+		}
+
+		public void Dispose(bool disposing)
+		{
+			if (!_disposed)
+			{
+				if (disposing)
+				{
+					Terminate();
+				}
+				_disposed = true;
+			}
+		}
+
+		private IDisposableAction Subscribe(Type message, Type consumer = null)
+		{
+			if (_disposed) return null;
+
+			if (!typeof(IMessage).IsAssignableFrom(message)) return new DisposableAction(() => { });
+
+			// this is a dynamic subscription that should be 
+			// removed when not needed any more for the bus:
+			var subscription = new Subscription();
+			subscription.Component = consumer == null ? "{N/A}" : consumer.FullName;
+			subscription.Message = message.FullName;
+			subscription.IsActive = true;
+			subscription.Uri = this._transport.Endpoint.EndpointUri.OriginalString;
+
+			SendInternal(new RegisterSubscriptionMessage { Subscription = subscription });
+
+			Action remove = () => SendInternal(new UnregisterSubscriptionMessage { Subscription = subscription });
+
+			var token = new DisposableAction(remove);
+			_tokens.Add(token);
+
+			return token;
+		}
+
+		private void Initialize()
+		{
+			// start the background processes:
+			try
+			{
+				RefreshEndpoint(true);
+				RefreshAgents(true);
+				RefreshScheduler(true);
+				MapAllFaultHandlers();
+				RefreshBusModules(true);
+			}
+			catch (Exception e)
+			{
+				if (!OnBusError(e))
+					throw;
+			}
+
+			// send the event to the log that the bus has started:
+			OnComponentStarted(this, new ComponentStartedEventArgs("Bus"));
+
+			// signal any external event consumers of this bus that it has started:
+			if (OnStart != null)
+			{
+				OnStart("Bus Started");
+			}
+
+			// send the message to allow the consumers to gracefully start-up:
+			var msg = new EndpointStarted { Endpoint = this._transport.Endpoint.EndpointUri.OriginalString };
+			var envelope = new Envelope();
+			envelope.Header.RecordStage(this, msg, "Bus Started");
+			envelope.Body.Payload = msg;
+
+			this.InvokeConsumersForReceive(envelope);
+
+			IsRunning = true;
+		}
+
+		private void Terminate(bool haltInfrastructure = true, bool cleanUpState = true)
+		{
+			if (IsRunning)
+			{
+				// halt the infrastructure for the bus:
+				if (haltInfrastructure)
+				{
+					// forcibly un-subscribe transient instances:
+					foreach (IDisposableAction token in _tokens)
+					{
+						token.Dispose();
+					}
+
+					// send the message to allow the consumers to gracefully shut-down:
+					var msg = new EndpointStopped { Endpoint = this._transport.Endpoint.EndpointUri.OriginalString };
+					var envelope = new Envelope();
+					envelope.Header.RecordStage(this, msg, "Bus Stop");
+					envelope.Body.Payload = msg;
+
+					InvokeConsumersForReceive(envelope);
+
+					// stop the background processes:
+					RefreshEndpoint(false);
+					RefreshAgents(false);
+					RefreshScheduler(false);
+					RefreshBusModules(false);
+
+					// send the event to the log that the bus has stopped:
+					OnComponentStopped(this, new ComponentStoppedEventArgs("Bus"));
+
+					// signal any external event consumers of this bus that it has stopped:
+					if (OnStop != null)
+					{
+						OnStop("Bus Stopped");
+					}
+				}
+			}
+
+			// clean up any internal state:
+			if (cleanUpState)
+			{
+				if (_tokens != null)
+				{
+					_tokens.Clear();
+				}
+				_tokens = null;
+
+				if (_requests != null)
+				{
+					_requests.Clear();
+				}
+				_requests = null;
+
+				_timeoutAgent = null;
+
+				if (_typedHandlersCache != null)
+				{
+					_typedHandlersCache.Clear();
+				}
+				_typedHandlersCache = null;
+
+				if(_transport != null)
+				{
+					_transport = null;
+				}
+			}
+
+			IsRunning = false;
+		}
+
+		private void RefreshEndpoint(bool isStarting)
+		{
+			if (isStarting)
+			{
+				if(this._transport == null)
+					throw new ApplicationException(string.Format("No transports have been configured and/or registered for the scheme '{0}' on the service bus endpoint." + 
+						"Please remember to include the library that contains your transport to the executable directory of the service bus.",
+						this._transport.Endpoint.Scheme));
+
+				lock (_endpoint_lock)
+				{
+					this._transport.OnMessageReceived += OnMessageReceivedEventHandler;
+					this._transport.OnReceiveError += OnTransportReceiveErrorEventHandler;
+					this._transport.OnRetryExhausted += OnTransportRetryExhaustedEventHandler;
+					this._transport.SerializationProvider = this.Find<ISerializationProvider>();
+					((IStartable)_transport).Start();
+
+					this.OnBusNotification(new ComponentNotificationEventArgs(NotificationLevel.Info,
+					                                                          string.Format(
+					                                                          	"Service Bus Transport Information >> Type: {0} , Txns Supported: {1}, Txn Isolation Level : {2}, " + 
+																				" #Worker Threads: {3}, # Retries: {4}",
+																				this._transport.GetType().FullName,
+					                                                          	this._transport.IsTransactional,
+					                                                          	this._transport.TransactionIsolationLevel.ToString(), 
+																				this._transport.NumberOfWorkerThreads.ToString("G"), 
+																				this._transport.MaxRetries.ToString("G")
+																				)));
+				}
+			}
+			else
+			{
+				lock (_endpoint_lock)
+				{
+					this._transport.OnMessageReceived -= OnMessageReceivedEventHandler;
+					this._transport.OnReceiveError -= OnTransportReceiveErrorEventHandler;
+					this._transport.OnRetryExhausted -= OnTransportRetryExhaustedEventHandler;
+					((IStartable)this._transport).Stop();
+				}
+			}
+		}
+
+		private void RefreshAgents(bool isStarting)
+		{
+			if (isStarting)
+			{
+				_timeoutAgent = Find<ITimeoutsService>();
+				((IStartable)_timeoutAgent).Start();
+			}
+			else
+			{
+				if (_timeoutAgent != null)
+				{
+					((IStartable)_timeoutAgent).Stop();
+				}
+			}
+		}
+
+		private void RefreshScheduler(bool isStarting)
+		{
+			if (isStarting)
+			{
+				_scheduler.ComponentNotificationEvent += OnComponentNotification;
+				_scheduler.ComponentErrorEvent += OnComponentError;
+
+				if (_scheduler.IsRunning == false)
+				{
+					_scheduler.OnMessageReceived = (message) => RouteScheduledMessage(message);
+					_scheduler.Start();
+				}
+			}
+			else
+			{
+				_scheduler.OnMessageReceived = null;
+				_scheduler.ComponentNotificationEvent -= OnComponentNotification;
+				_scheduler.ComponentErrorEvent -= OnComponentError;
+				_scheduler.Stop();
+			}
+		}
+
+		private void RefreshBusModules(bool isStarting)
+		{
+			ICollection<IBusModule> modules = null;
+
+			try
+			{
+				modules = FindAll<IBusModule>();
+			}
+			catch
+			{
+			}
+
+			if (modules != null)
+			{
+				foreach (IBusModule module in modules)
+				{
+					try
+					{
+						if (isStarting)
+						{
+							module.Start(_kernel);
+
+							var notificationEventArgs = new ComponentNotificationEventArgs(NotificationLevel.Info,
+																						   string.Format(
+																							"Bus module '{0}' started on endpoint '{1}'",
+																							module.GetType().Name,
+																							this._transport.Endpoint.EndpointUri.OriginalString));
+
+							OnBusNotification(notificationEventArgs);
+						}
+						else
+						{
+							module.Dispose();
+
+							var notificationEventArgs = new ComponentNotificationEventArgs(NotificationLevel.Info,
+																						   string.Format(
+																							"Bus module '{0}' stopped on endpoint '{1}",
+																							module.GetType().Name,
+																							this._transport.Endpoint.EndpointUri.OriginalString));
+
+							OnBusNotification(notificationEventArgs);
+						}
+					}
+					catch (Exception exception)
+					{
+						var notificationEventArgs = new ComponentNotificationEventArgs(NotificationLevel.Warn,
+																					   string.Format(
+																						"An error has occurred while starting/stopping bus module '{0}', the module will not be avaliable if starting the service bus. Reason: {1} , Stack Trace : {2} ",
+																						module.GetType().Name,
+																						exception.Message,
+																						exception.StackTrace));
+						OnBusNotification(notificationEventArgs);
+
+						module.Dispose();
+
+						continue;
+					}
+				}
+			}
+		}
+
+		private void MapAllFaultHandlers()
+		{
+			var registry = Find<IFaultHandlerConfigurationRepository>();
+			var faultHandlerConfiguration = new FaultHandlerConfiguration();
+
+			// no consumer associated with a message fault handler:
+			faultHandlerConfiguration.ForMessage<NoConsumerForMessageFaultMessage>()
+				.WithHandler<NoConsumerForMessageFaultHandler>();
+			registry.Register(faultHandlerConfiguration);
+
+			// no subscription for publication of message when central pub/sub 
+			// endpoint is not present fault handler:
+			faultHandlerConfiguration.ForMessage<NoSubscriptionForMessageFaultMessage>()
+				.WithHandler<NoSubscriptionForPublishedMessageFaultHandler>();
+			registry.Register(faultHandlerConfiguration);
+		}
+
+		private void InvokeFaultHandlerForNonPublishableMessages(IEnumerable<object> messages)
+		{
+			foreach (var message in messages)
+			{
+				// move the message that could not be consumed to the recovery/error endpoint:
+				var fault = new NoSubscriptionForMessageFaultMessage { Message = message };
+				var processor = this.Find<IFaultProcessor>();
+				processor.Process(fault);
+			}
+		}
+
+		private void EnqueueRequestForPossibleReply<TMessage>(TMessage message) 
+			where TMessage : class, IMessage
+		{
+			lock (_request_lock)
+			{
+				if (!typeof(IAdminMessage).IsAssignableFrom(message.GetType()))
+					_requests.AddUnique(message);
+			}
+		}
+
+		/// <summary>
+		/// This will take any message that is created by the scheduled
+		/// task and send it to the corresponding endpoint or consumer.
+		/// </summary>
+		/// <param name="message">Message sent by scheduled task</param>
+		private void RouteScheduledMessage(object message)
+		{
+			if (message is EndpointHeartBeat)
+			{
+				var endpoint = new Uri(((EndpointHeartBeat)message).EndpointUri);
+				Send(endpoint, message);
+			}
+			else if (typeof(IAdminMessage).IsAssignableFrom(message.GetType()))
+			{
+				SendInternal(message);
+			}
+			else
+			{
+				Publish(message);
+			}
+		}
+
+		/// <summary>
+		/// This will ensure that a message batch or a collection on a message does 
+		/// not exceed the pre-set limit for itemized collection passing on the bus instance.
+		/// </summary>
+		/// <param name="messages">Collection to inspect for exceeding batch limit</param>
+		private static void GuardOnBatchLimit(ICollection<object> messages)
+		{
+			if (messages.Count > MessageBatchSize)
+			{
+				throw new MessageBatchExceededException();
+			}
+
+			foreach (object message in messages)
+			{
+				IEnumerable<PropertyInfo> collectionProperties =
+					(from property in message.GetType().GetProperties()
+					 where typeof(IEnumerable).IsAssignableFrom(
+						property.PropertyType)
+					 select property).ToList();
+
+				foreach (PropertyInfo property in collectionProperties)
+				{
+					ICollection collection = null;
+
+					try
+					{
+						collection = (ICollection)property.GetValue(message, null);
+					}
+					catch
+					{
+						continue;
+					}
+
+					if (collection != null)
+					{
+						if (collection.Count > MessageBatchSize)
+						{
+							throw new MessageBatchExceededForMessageException(message);
+						}
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// This will send the message out to the message owners for processing.
+		/// </summary>
+		/// <param name="messages">Collection of messages to send.</param>
+		private void SendInternal(params object[] messages)
+		{
+			GuardOnBatchLimit(messages);
+
+			foreach (object message in messages)
+			{
+				var envelope = new Envelope();
+				envelope.Header.LocalEndpoint = this._transport.Endpoint.EndpointUri.OriginalString;
+				envelope.Header.ReplyEndpoint = this._transport.Endpoint.EndpointUri.OriginalString;
+				envelope.Body.Payload = message;
+				envelope.Header.RecordStage(this, message, "Send");
+
+				// always push messages out to the endpoint for consumption (if subscriptions found):
+				var subscriptions = this.FindAllSubscriptionsForMessage(message);
+
+				// local message for processing (do not push to endpoint, consume internally):
+				if (subscriptions.Count == 0)
+					InvokeConsumersForReceive(envelope);
+				else
+				{
+					// remote push for send:
+					foreach (var subscription in subscriptions)
+					{
+						this.Send(subscription.Uri.ToUri(), message);
+					}
+				}
+
+			}
+		}
+
+		/// <summary>
+		/// This will send the message out to the intended parties for processing.
+		/// </summary>
+		/// <param name="messages">Collection of messages to publish.</param>
+		private ICollection<Subscription> PublishInternal(params object[] messages)
+		{
+			var subscriptions = new List<Subscription>();
+
+			GuardOnBatchLimit(messages);
+
+			foreach (var message in messages)
+			{
+				var envelope = new Envelope();
+				envelope.Header.LocalEndpoint = this._transport.Endpoint.EndpointUri.OriginalString;
+				envelope.Body.Payload = message;
+				envelope.Header.RecordStage(this, message, "Publish");
+
+				var endpointSubscriptions = DeliverToEndpoint(envelope);
+
+				foreach (var endpointSubscription in endpointSubscriptions)
+				{
+					subscriptions.AddUnique(endpointSubscription);
+				}
+			}
+
+			return subscriptions;
+		}
+
+		/// <summary>
+		/// This will find the correct endpoint where the message 
+		/// can be consumed and subsequently the message is sent
+		/// to the endpoint according to the endpoint semantics.
+		/// </summary>
+		/// <param name="envelope"></param>
+		private ICollection<Subscription> DeliverToEndpoint(IEnvelope envelope)
+		{
+			object message = envelope.Body.Payload;
+			ICollection<Subscription> subscriptions = FindAllSubscriptionsForMessage(message);
+
+			// at this point, a component has issued a request to send a message
+			// out to the endpoint for all interested components to pick-up and 
+			// process, we need to find all of the parties that are interested in receiving 
+			// the message via the subscription repository:
+			if (typeof(IAdminMessage).IsAssignableFrom(message.GetType()))
+			{
+				// do not dispatch the messge to the physical endpoint 
+				// if it is an internal admin message or event, this will create a 
+				// a recursive loop of receiving and sending on the endpoint,
+				// just push it to the component that can handle the message:
+				InvokeConsumersForReceive(envelope);
+			}
+			else
+			{
+				// dispatch the message to the endpoint:
+				InvokeTransportForSend(envelope, subscriptions);
+			}
+
+			return subscriptions;
+		}
+
+		/// <summary>
+		/// This will take the current messaging envelope and 
+		/// use the service message pipeline to change the message
+		/// into the appropriate format for dispatching to the component 
+		/// for consumption.
+		/// </summary>
+		/// <param name="envelope">Message to send to service for dispatch.</param>
+		private void InvokeConsumersForReceive(IEnvelope envelope)
+		{
+			if (!typeof(IAdminMessage).IsAssignableFrom(envelope.Body.Payload.GetType()))
+				this.BuildCurrentMessageEnvelope(envelope);
+
+			var modules = _kernel.ResolveAll<IMessageModule>().ToHashSet<IMessageModule>();
+
+			FireMessageModules(modules, envelope);
+
+			DeliverToComponent(envelope);
+
+			FireMessageModules(modules, envelope, false);
+		}
+
+		/// <summary>
+		/// This will find the correct message handling component 
+		/// and dispatch the message directly to it.
+		/// </summary>
+		/// <param name="envelope"></param>
+		private void DeliverToComponent(IEnvelope envelope)
+		{
+			IEnumerable<IConsumer> handlers = null;
+			object message = envelope.Body.Payload;
+			bool faultHandlerExecuted = false;
+
+			handlers = GetHandlersForMessage(envelope, message, out faultHandlerExecuted, false);
+
+			if (faultHandlerExecuted) return;
+
+			if (handlers.Count() == 0)
+			{
+				this.Publish(message);
+				return;
+			}
+
+			//var invokedHandlers = new List<Type>();
+
+			foreach (IConsumer handler in handlers.Distinct())
+			{
+				//if (invokedHandlers.Contains(handler.GetType())) continue;
+				//invokedHandlers.Add(handler.GetType());
+
+				if (typeof(SagaStateMachine).IsAssignableFrom(handler.GetType()) && 
+					typeof(ISagaMessage).IsAssignableFrom(message.GetType()))
+				{
+					Find<ISagaStateMachineMessageDispatcher>().Dispatch(this, handler, envelope);
+				}
+				else
+				{
+					Find<ISimpleConsumerMessageDispatcher>().Dispatch(this, handler, envelope);
+				}
+
+				this._kernel.ReleaseComponent(handler);
+			}
+		}
+
+		/// <summary>
+		/// This will invoke the message modules for start and completion of message dispatch to a component:
+		/// </summary>
+		/// <param name="modules"></param>
+		/// <param name="envelope"></param>
+		/// <param name="useStartAction"></param>
+		private void FireMessageModules(IEnumerable<IMessageModule> modules,
+			IEnvelope envelope,
+			bool useStartAction = true)
+		{
+			if (typeof(IAdminMessage).IsAssignableFrom(envelope.Body.Payload.GetType())) return;
+
+			if (modules == null || modules.Count() == 0) return;
+
+			foreach (IMessageModule module in modules)
+			{
+				try
+				{
+					if (useStartAction)
+					{
+						envelope.Header.RecordStage(module, envelope.Body.Payload, "Start Module - " + module.GetType().Name);
+						module.OnMessageStartProcessing(_kernel, envelope.Body.Payload);
+					}
+					else
+					{
+						envelope.Header.RecordStage(module, envelope.Body.Payload, "End Module - " + module.GetType().Name);
+						module.OnMessageEndProcessing(_kernel, envelope.Body.Payload);
+					}
+				}
+				catch (Exception exception)
+				{
+					string msg =
+						string.Format(
+							"An error has occurred while attempting to execute the message module '{0}', it will be skipped as a result. Reason: {1}",
+							module.GetType().FullName, exception);
+					OnComponentNotification(this, new ComponentNotificationEventArgs(NotificationLevel.Warn, msg));
+					continue;
+				}
+				finally
+				{
+					this._kernel.ReleaseComponent(module);
+				}
+			}
+		}
+
+		/// <summary>
+		/// This will take the current native message implemenation 
+		/// and find the correct endpoint uri from the subscription 
+		/// repository and deliver the message to the indicated endpoint.
+		/// </summary>
+		/// <param name="envelope">Message to send to an endpoint.</param>
+		/// <param name="subscriptions"></param>
+		private void InvokeTransportForSend(IEnvelope envelope, IEnumerable<Subscription> subscriptions)
+		{
+			foreach (Subscription subscription in subscriptions)
+			{
+				envelope.Header.RemoteEndpoint = subscription.Uri;
+
+				DispatchMessageViaTransport(new Uri(subscription.Uri), envelope); 
+
+				var endpointMessageSent =
+					new EndpointMessageSent(string.Empty, subscription.Uri, envelope.Body.Payload);
+
+				SendInternal(endpointMessageSent);
+			}
+
+		}
+
+		/// <summary>
+		/// This will extract all of the consumers of the given message.
+		/// </summary>
+		/// <param name="envelope"></param>
+		/// <param name="message">Message to inspect for all locally available consumers.</param>
+		/// <param name="throwExceptionOnHandlerNotFound"></param>
+		/// <param name="faultHandlerExecuted"></param>
+		/// <returns></returns>
+		private IEnumerable<IConsumer> GetHandlersForMessage(IEnvelope envelope,
+			object message,
+			out bool faultHandlerExecuted,
+			bool throwExceptionOnHandlerNotFound = true)
+		{
+			var theHandlers = new List<IConsumer>();
+
+			faultHandlerExecuted = false;
+
+			if (_disposed) return theHandlers;
+
+			// check the cache first for the handlers that are keyed by type:
+			_typedHandlersCache.TryGetValue(message.GetType(), out theHandlers);
+
+			if (theHandlers != null && theHandlers.Count > 0) return theHandlers;
+
+			// get a new collection of handlers (try-get returns null):
+			theHandlers = new List<IConsumer>();
+
+			// check to see if a set of pre-configured handlers are registered for the message:
+			var handlerConfigurationRegistry = Find<IHandlerConfigurationRepository>();
+			ICollection<Type> configuredHandlers =
+				handlerConfigurationRegistry.FindConsumersForMessage(message);
+
+			if (configuredHandlers.Count > 0)
+			{
+				foreach (Type configuredHandler in configuredHandlers)
+				{
+					object consumer = Find(configuredHandler);
+					if (consumer == null) continue;
+					theHandlers.Add(consumer as IConsumer);
+				}
+			}
+			else
+			{
+				// get the message handlers for the current message and its interfaces:
+				List<Type> implementations = ResolvedConsumersImplementationsFromMessage(message.GetType());
+
+				// get the implementations for all of the interfaces on the message proxy:
+				if (message.GetType().Name.Contains("Proxy") == true)
+				{
+					foreach (Type theInterface in message.GetType().GetInterfaces())
+					{
+						List<Type> impl = ResolvedConsumersImplementationsFromMessage(theInterface);
+						implementations.AddRange(impl);
+					}
+				}
+
+				// pull back all of the message handlers for the list of implementations:
+				foreach (var implementation in implementations)
+				{
+					var handlers = this._kernel.ResolveAll(implementation).ToHashSet<IConsumer>();
+					theHandlers.AddRange(handlers);
+				}
+
+			}
+
+			// add all of the distinct handlers to the cache for the current message:
+			if (theHandlers.Count > 0)
+			{
+				_typedHandlersCache.TryAddValue(message.GetType(), theHandlers.Distinct().ToList());
+			}
+
+			if (throwExceptionOnHandlerNotFound == false && theHandlers.Count() == 0)
+			{
+				faultHandlerExecuted = true;
+
+				if (typeof(IAdminMessage).IsAssignableFrom(message.GetType()) == false)
+				{
+					// move the message that could not be consumed to the recovery/error endpoint:
+					var fault = new NoConsumerForMessageFaultMessage {Message = message};
+					var processor = this.Find<IFaultProcessor>();
+					processor.Process(fault, envelope);
+				}
+			}
+
+			return theHandlers.Distinct().ToList();
+		}
+
+		/// <summary>
+		/// This will create the generic type from the common interface-based consumer contract.
+		/// methods.
+		/// </summary>
+		/// <param name="message">Message to create the generic interface types for.</param>
+		/// <returns></returns>
+		private static List<Type> ResolvedConsumersImplementationsFromMessage(Type message)
+		{
+			var consumerImplementations = new List<Type>();
+
+			if (message.FullName.StartsWith(typeof(CorrelatedBy<>).FullName)) return consumerImplementations;
+			if (message.FullName.StartsWith("Castle")) return consumerImplementations;
+
+			// transient consumer implementations:
+			consumerImplementations.Add(typeof(TransientConsumerOf<>).MakeGenericType(message));
+			consumerImplementations.Add(typeof(TransientConsumerOf<>).MakeGenericType(typeof(IMessage)));
+
+			// state machine messages:
+			consumerImplementations.Add(typeof(StartedBy<>).MakeGenericType(message));
+			consumerImplementations.Add(typeof(OrchestratedBy<>).MakeGenericType(message));
+
+			// add the generic implementation for the state machine messages:
+			consumerImplementations.Add(typeof(StartedBy<>).MakeGenericType(typeof(IMessage)));
+			consumerImplementations.Add(typeof(OrchestratedBy<>).MakeGenericType(typeof(IMessage)));
+
+			// add the type for the consumer message:
+			consumerImplementations.Add(typeof(Consumes<>).MakeGenericType(message));
+
+			// generic catch all implementations from base contract:
+			consumerImplementations.Add(typeof(Consumes<>).MakeGenericType(typeof(IMessage)));
+
+			return consumerImplementations;
+		}
+
+		/// <summary>
+		/// This will create a temporary message subscription for the 
+		/// component type provided on the service bus.
+		/// </summary>
+		/// <param name="theType">Type of the consumer to create a temporary registration for.</param>
+		/// <returns></returns>
+		private IDisposableAction CreateInstanceConsumerWithSubscriptions(Type theType)
+		{
+			var theMessages = new List<Type>();
+
+			List<Type> theInterfaces = (from anInterface in theType.GetInterfaces()
+										where anInterface.FullName.StartsWith(typeof(TransientConsumerOf<>).FullName)
+										select anInterface).Distinct().ToList();
+
+			if (theInterfaces == null || theInterfaces.Count == 0)
+			{
+				throw InstanceSubscriptionIsNotConfiguredAsTransientConsumerException(theType);
+			}
+
+			if (theInterfaces.Count > 0)
+			{
+				theMessages = (from type in theInterfaces
+							   let message = type.GetGenericArguments()[0]
+							   select message).Distinct().ToList();
+
+				// can only have transient consumers with concrete messages:
+				if ((from message in theMessages where message.IsInterface select message).Count() > 0)
+				{
+					throw InterfacesDefinedForTransientMessageConsumptionException(theType);
+				}
+
+				// register the component against all declared interfaces:
+				foreach (var theInterface in theInterfaces)
+				{
+					try
+					{
+						_kernel.AddComponent(string.Concat(theType.Name, " - ", theInterface.Name, " - ",
+							theInterface.GetGenericArguments()[0].Name), theInterface, theType);
+					}
+					catch
+					{
+						continue;
+					}
+
+				}
+
+				// build the local subscriptions against the component:
+				if (theMessages.Count > 0)
+				{
+					foreach (Type message in theMessages)
+					{
+						this.Subscribe(message, theType);
+					}
+				}
+			}
+
+			// create the action to remove the instance subscription and component:
+			Action remove = () =>
+								{
+									foreach (Type message in theMessages)
+									{
+										var subscription = new Subscription
+															{
+																Component = theType.FullName,
+																Message = message.FullName,
+																Uri = this._transport.Endpoint.EndpointUri.OriginalString
+															};
+										SendInternal(new UnregisterSubscriptionMessage { Subscription = subscription });
+									}
+
+									_kernel.RemoveComponent(theType.Name);
+								};
+
+			OnComponentNotification(this,
+									new ComponentNotificationEventArgs(NotificationLevel.Debug,
+																	   string.Format(
+																		"Created instance subscription for transient consumer '{0}' and its consumed message(s) '[{1}]' on the bus endpoint.",
+																		theType.FullName, theMessages.ToItemList())));
+
+			return new DisposableAction(remove);
+		}
+
+		private void DispatchMessageViaTransport(Uri endpoint, IEnvelope envelope)
+		{
+			var endpointTransport = this.Find<IEndpointFactory>().Build(endpoint);
+
+			if (endpointTransport != null)
+			{
+				endpointTransport.Transport.SerializationProvider = this.Find<ISerializationProvider>();
+				endpointTransport.Transport.Send(endpointTransport.Endpoint, envelope);
+			}
+		}
+
+		private void BuildCurrentMessageEnvelope(IEnvelope envelope)
+		{
+			this.CurrentEnvelope = envelope;
+		}
+
+		private ICollection<Subscription> FindAllSubscriptionsForMessage(object message)
+		{
+			List<Subscription> subscriptions;
+
+			if (message.GetType().AssemblyQualifiedName.Contains("proxyAssembly"))
+			{
+				subscriptions = (from subscription in _subscriptionRepository.Subscriptions
+								 where
+									message.GetType().GetInterfaces().Where(x => x.FullName == subscription.Message).FirstOrDefault() !=
+									null
+								 select subscription).Distinct().ToList();
+			}
+			else if (message.GetType().BaseType != null & message.GetType().FullName.Contains("Proxy"))
+			{
+				subscriptions = (from subscription in _subscriptionRepository.Subscriptions
+								 where subscription.Message == message.GetType().BaseType.FullName
+								 select subscription).Distinct().ToList();
+			}
+			else
+			{
+				subscriptions = (from subscription in _subscriptionRepository.Subscriptions
+								 where subscription.Message == message.GetType().FullName
+								 select subscription).Distinct().ToList();
+			}
+
+			return subscriptions;
+		}
+
+		private void ForwardMessagesToControlEndpoint(params object[] messages)
+		{
+			IControlEndpoint controlEndpoint = GetControlEndpoint();
+
+			if (controlEndpoint == null) return;
+
+			foreach (var message in messages)
+			{
+				Send(controlEndpoint.Uri.ToUri(), message);
+			}
+		}
+
+		/// <summary>
+		/// This is the callback that is attached to every service endpoint instance 
+		/// <seealso cref="RefreshEndpoint"/> that will relay the received message 
+		/// to the message bus for possible multi-component consumption.
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="messageReceivedEventArgs">Event arguements from the transport containing the message to process.</param>
+		private void OnMessageReceivedEventHandler(object sender, MessageReceivedEventArgs messageReceivedEventArgs)
+		{
+			IEnvelope envelope = messageReceivedEventArgs.Envelope;
+
+			if (typeof(IAdminMessage).IsAssignableFrom(envelope.Body.Payload.GetType()) == false)
+			{
+				var messageReceivedEvent =
+					new EndpointMessageReceived(this._transport.Endpoint.EndpointUri.OriginalString, envelope.Body.Payload);
+
+				InvokeConsumersForReceive(new Envelope(messageReceivedEvent));
+			}
+
+			InvokeConsumersForReceive(envelope);
+		}
+
+		private void OnTransportReceiveErrorEventHandler(IEnvelope envelope, Exception exception)
+		{
+			// ("fault" condition) at this point, let the fault handlers run that are defined for the message:
+			var faultProcessor = Find<IFaultProcessor>();
+			faultProcessor.Process(envelope.Body.Payload, envelope, exception);
+
+			this.OnComponentNotification(this,
+			  new ComponentNotificationEventArgs(NotificationLevel.Warn, exception.ToString()));
+		}
+
+		private void OnTransportRetryExhaustedEventHandler(IEnvelope envelope, Exception exception)
+		{
+			OnTransportReceiveErrorEventHandler(envelope, exception);
+		}
+
+		private void OnBusNotification(ComponentNotificationEventArgs args)
+		{
+			EventHandler<ComponentNotificationEventArgs> evt = ComponentNotificationEvent;
+
+			if (evt != null)
+			{
+				evt(this, args);
+			}
+			else
+			{
+				try
+				{
+					var logger = Find<ILogger>();
+
+					if (logger == null) return;
+
+					switch (args.Level)
+					{
+						case NotificationLevel.Debug:
+							logger.LogDebugMessage(args.Message);
+							break;
+						case NotificationLevel.Info:
+							logger.LogInfoMessage(args.Message);
+							break;
+						case NotificationLevel.Warn:
+							logger.LogWarnMessage(args.Message);
+							break;
+					}
+				}
+				catch
+				{
+					// no logging component registered...
+#if DEBUG
+					Debug.WriteLine(args.Message);
+#endif
+				}
+			}
+		}
+
+		private void OnComponentNotification(object sender, ComponentNotificationEventArgs e)
+		{
+			OnBusNotification(e);
+		}
+
+		private void OnComponentStarted(object sender, ComponentStartedEventArgs e)
+		{
+			string message = string.Format("Component '{0}' started.", e.ComponentName);
+			var args =
+				new ComponentNotificationEventArgs(NotificationLevel.Debug, message);
+
+			OnBusNotification(args);
+		}
+
+		private void OnComponentStopped(object sender, ComponentStoppedEventArgs e)
+		{
+			string message = string.Format("Component '{0}' stopped.", e.ComponentName);
+			var args = new ComponentNotificationEventArgs(NotificationLevel.Debug, message);
+
+			OnBusNotification(args);
+		}
+
+		private void OnComponentError(object sender, ComponentErrorEventArgs e)
+		{
+			OnBusError(e.Exception);
+		}
+
+		private bool OnBusError(Exception exception)
+		{
+			EventHandler<ComponentErrorEventArgs> evt = ComponentErrorEvent;
+
+			bool isHandlerAttached = (evt != null);
+
+			if (isHandlerAttached)
+				evt(this, new ComponentErrorEventArgs(exception));
+
+			var logger = Find<ILogger>();
+
+			if (logger != null)
+			{
+				logger.LogErrorMessage(exception.Message, exception);
+			}
+
+			return isHandlerAttached;
+		}
+
+		private void NoSubscriptionsRegisteredForMessagesPublicationException(IEnumerable<object> messages)
+		{
+			var theMessages = new StringBuilder();
+
+			foreach (var message in messages)
+			{
+				theMessages.Append(message.GetType().FullName).Append(", ");
+			}
+
+			if (GetControlEndpoint() == null)
+			{
+				var listing = theMessages.ToString().TrimEnd(new char[] { ',', ' ' });
+
+				var msg = string.Format("For the following message(s) '{0}' a subscription entry was not found for publication on bus endpoint '{1}'. " +
+										  "Please ensure that the message(s) has been properly mapped to an endpoint for enlistment in the subscriptions listing for publication.",
+										   listing,
+										   this._transport.Endpoint.EndpointUri.OriginalString);
+
+				var theException = new Exception(msg);
+
+				Find<ILogger>().LogErrorMessage(theException.Message, theException);
+			}
+			else
+			{
+				ForwardMessagesToControlEndpoint(messages.ToArray());
+			}
+		}
+
+		private Exception CouldNotResolveAllImplementationsFromComponentException(Type component, Exception exception)
+		{
+			var theException =
+				new Exception(
+					string.Format("The following component '{0}' did not not have any mulitple implemenations in the container." +
+								  "Please check the external configuration and/or the endpoint configuration to make sure that the component and its implemenations are added to the container.",
+								  component.FullName), exception);
+			Find<ILogger>().LogErrorMessage(theException.Message, theException);
+			return theException;
+		}
+
+		private Exception CouldNotResolveComponentException(Type component, Exception exception)
+		{
+			var theException =
+				new Exception(string.Format("The following component '{0}' could not be resolved from the container." +
+											"Please check the external configuration and/or the endpoint configuration to make sure that the component is added to the container.",
+											component.FullName), exception);
+			Find<ILogger>().LogErrorMessage(theException.Message, theException);
+			return theException;
+		}
+
+		private Exception CouldNotCreateComponentFromInterfaceException(Type component, Exception exception)
+		{
+			var theException =
+				new Exception(
+					string.Format("The following component '{0}' could not be created from its interface-based implementation." +
+								  "Please check the external configuration and/or the endpoint configuration to make sure that the message is added to the container.",
+								  component.FullName), exception);
+			Find<ILogger>().LogErrorMessage(theException.Message, theException);
+			return theException;
+		}
+
+		private Exception CouldNotStartMessageBusException(Exception exception)
+		{
+			var theException =
+				new Exception("An error has occurred while attempting to start the message bus. Reason:" + exception.Message,
+							  exception);
+			Find<ILogger>().LogErrorMessage(theException.Message, theException);
+			return theException;
+		}
+
+		private Exception InstanceSubscriptionIsNotConfiguredAsTransientConsumerException(Type consumer)
+		{
+			var theException =
+				new Exception(string.Format("For registering the message consumer '{0}' as a transient instance, the consumer " +
+											"must only implement the interface '{1}'.",
+											consumer.FullName,
+											typeof(TransientConsumerOf<>).FullName.Replace("`1", "<>")));
+			Find<ILogger>().LogWarnMessage(theException.Message, theException);
+			return theException;
+		}
+
+		private Exception MessageToCreateNotImplementedAsInterfaceException(Type type)
+		{
+			var theException =
+				new Exception(
+					string.Format(
+						"The message '{0}' was not defined as an interface for the bus to create a proxy from the interface specification. " +
+						"In order to create a message, the definition must be supplied as an interface.", type.FullName));
+			Find<ILogger>().LogWarnMessage(theException.Message, theException);
+			return theException;
+		}
+
+		private Exception InterfacesDefinedForTransientMessageConsumptionException(Type type)
+		{
+			var theException =
+				new Exception(string.Format("For the transient message consumer '{0}' that is registered on the message bus, " +
+											"the list of consumed messages can not be based on an interface definition. Only concrete message types can be noted " +
+											"for consumption on a transient message consumer.", type.FullName));
+
+			Find<ILogger>().LogWarnMessage(theException.Message, theException);
+
+			return theException;
+		}
+	}
+}

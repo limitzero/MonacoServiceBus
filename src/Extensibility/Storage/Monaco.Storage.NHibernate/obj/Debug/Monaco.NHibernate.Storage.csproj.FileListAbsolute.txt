@@ -1,0 +1,2 @@
+C:\repositories\Monaco\build\Monaco.NHibernate.Storage.dll
+C:\repositories\Monaco\build\Monaco.NHibernate.Storage.pdb

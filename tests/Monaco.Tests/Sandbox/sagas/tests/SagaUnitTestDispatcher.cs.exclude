@@ -1,0 +1,59 @@
+﻿using System;
+using System.Linq;
+
+using Monaco.Sagas.StateMachine;
+
+namespace Monaco.Tests.Sandbox.sagas.tests
+{
+	public class SagaUnitTestDispatcher
+	{
+		public void Dispatch<TMessage>(SagaStateMachine saga, TMessage message)
+			where TMessage : IMessage
+		{
+			bool isStartOfNewSaga = saga as StartedBy<TMessage> != null;
+
+			if (isStartOfNewSaga)
+			{
+				Guid instanceId = Guid.NewGuid();
+				((ISaga)saga).InstanceId = instanceId;
+				ConsumeMessage(saga, message, true);
+			}
+			else
+			{
+				ConsumeMessage(saga, message, false);
+			}
+		}
+
+		private static void ConsumeMessage(SagaStateMachine saga, IMessage message, bool isStarting = false)
+		{
+			saga.CurrentMessage = message;
+			SagaEventTriggerCondition condition = null;
+
+			if (isStarting)
+			{
+				condition = saga.TriggerConditions.Single( x=>x.Stage ==  SagaStage.Initially).Condition;
+			}
+			else
+			{
+				// subsequent stages in the saga, need to get the configuration by current state of saga for "While":
+				var triggerCondtions = saga.TriggerConditions.Where(x => x.Stage == SagaStage.While).ToList();
+				if (triggerCondtions.Count() > 0)
+				{
+					condition = (from config in triggerCondtions
+					             where config.Condition.State.GetType() == saga.CurrentState.GetType()
+					             select config.Condition).SingleOrDefault();
+				}
+			}
+
+			// nothing matches for the stage/state combination (send warning???):
+			if (condition == null) return;
+
+			foreach (var messageAction in condition.MessageActions)
+			{
+				messageAction.Action();
+			}
+
+
+		}
+	}
+}

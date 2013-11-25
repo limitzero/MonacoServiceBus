@@ -1,0 +1,163 @@
+﻿using System;
+using System.Collections.Generic;
+using Monaco.Bus.Messages.For.Timeouts;
+
+namespace Monaco.Sagas.StateMachine
+{
+	/// <summary>
+	/// Configuration to hold the actions that will be taken for a message on the saga state machine.
+	/// </summary>
+	public class SagaMessageActionConfiguration
+	{
+		private readonly SagaStateMachine _saga;
+
+		/// <summary>
+		/// Gets or sets the state that the saga instance has transitioned into.
+		/// </summary>
+		public State State { get; set; }
+
+		/// <summary>
+		/// Gets the listing of message actions that will be invoked when a message arrives.
+		/// </summary>
+		public List<MessageAction> MessageActions { get; private set; }
+
+		public SagaMessageActionConfiguration(SagaStateMachine saga)
+		{
+			this._saga = saga;
+			this.MessageActions = new List<MessageAction>();
+		}
+
+		/// <summary>
+		/// This is the signal on the saga instance that will trigger the logic for the "Consume" method
+		/// that is type specific to the particular event constructed for handling the message.
+		/// </summary>
+		/// <typeparam name="TMessage">Concrete type of message to trigger the event for</typeparam>
+		/// <param name="theEvent">Definition of event to trigger message handling</param>
+		/// <returns></returns>
+		public SagaMessageActionConfiguration When<TMessage>(Event<TMessage> theEvent)
+			where TMessage : ISagaMessage, new()
+		{
+			this.CreateSagaAction(SagaMessageActionType.When, new TMessage(),
+			                      () => ((Consumes<TMessage>)this._saga).Consume((TMessage)this._saga.CurrentMessage));
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the saga instance will publish a message to one or more message consumers.
+		/// </summary>
+		/// <typeparam name="TMessage">Concrete type of the message to publish</typeparam>
+		/// <param name="publish">Function to create the message to publish</param>
+		/// <returns></returns>
+		public SagaMessageActionConfiguration Publish<TMessage>(Func<TMessage, TMessage> publish)
+			where TMessage : ISagaMessage, new()
+		{
+			var message = publish(new TMessage());
+			this.CreateSagaAction(SagaMessageActionType.Publish, message, () => this._saga.Bus.Publish(message));
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the saga instance will send a message to a consumer on the local bus 
+		/// instance.
+		/// </summary>
+		/// <typeparam name="TMessage">Concrete type of the message to send</typeparam>
+		/// <param name="send">Function to create the message to send</param>
+		/// <returns></returns>
+		public SagaMessageActionConfiguration Send<TMessage>(Func<TMessage, TMessage> send)
+			where TMessage : ISagaMessage, new()
+		{
+			var message = send(new TMessage());
+			this.CreateSagaAction(SagaMessageActionType.Send, message, () => this._saga.Bus.Send(message));
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the saga instance will send a message to a consumer on the local bus 
+		/// instance.
+		/// </summary>
+		/// <typeparam name="TMessage">Concrete type of the message to send</typeparam>
+		/// <param name="endpoint">The uri semantic for a location that will process the message</param>
+		/// <param name="send">Function to create the message to send</param>
+		/// <returns></returns>
+		public SagaMessageActionConfiguration SendToEndpoint<TMessage>(Uri endpoint,
+		                                                               Func<TMessage, TMessage> send)
+			where TMessage : ISagaMessage, new()
+		{
+			var message = send(new TMessage());
+
+			var messageAction = new MessageAction(SagaMessageActionType.SendToEndpoint,
+			                                      message, () => this._saga.Bus.Send(endpoint, message));
+			messageAction.Endpoint = endpoint.OriginalString;
+
+			this.MessageActions.Add(messageAction);
+
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the saga instance will send a reply for the current message being 
+		/// processed.
+		/// </summary>
+		/// <typeparam name="TMessage">Type of the message representing the reply</typeparam>
+		/// <param name="reply">Function to return the new reply message</param>
+		/// <returns></returns>
+		public SagaMessageActionConfiguration Reply<TMessage>(Func<TMessage, TMessage> reply)
+			where TMessage : ISagaMessage, new()
+		{
+			var message = reply(new TMessage());
+			this.CreateSagaAction(SagaMessageActionType.Reply, message, () => this._saga.Bus.Reply(message));
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that a message will be delayed for publication after a given interval.
+		/// </summary>
+		/// <typeparam name="TMessage">Concrete message to schedule for delayed delivery</typeparam>
+		/// <param name="duration">Time to wait before delivery</param>
+		/// <param name="delay">Function to create the message for delivery</param>
+		/// <returns></returns>
+		public SagaMessageActionConfiguration Delay<TMessage>(TimeSpan duration, Func<TMessage, TMessage> delay)
+			where TMessage : ISagaMessage, new()
+		{
+			var message = delay(new TMessage());
+			var timeout = new ScheduleTimeout(duration, message as IMessage);
+
+			var action = new MessageAction(SagaMessageActionType.Delay, message, () => this._saga.Bus.Send(timeout));
+			action.Delay = duration;
+
+			this.MessageActions.Add(action);
+
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal for the current saga to complete its processing.
+		/// </summary>
+		/// <returns></returns>
+		public SagaMessageActionConfiguration Complete()
+		{
+			this.CreateSagaAction(SagaMessageActionType.Complete, null, () => _saga.MarkAsCompleted());
+			return this;
+		}
+
+		/// <summary>
+		/// This will signal that the current saga will transition to a pre-defined state and wait
+		/// for a new event to be triggered for re-starting the processing
+		/// </summary>
+		/// <typeparam name="TState">The concrete state to set on the saga</typeparam>
+		/// <returns></returns>
+		public SagaMessageActionConfiguration TransitionTo<TState>() where TState : State, new()
+		{
+			this.State = new TState();
+			this.CreateSagaAction(SagaMessageActionType.Transition, null, () => { this._saga.MarkTransitionTo(this.State); }, this.State);
+			return this;
+		}
+
+		private void CreateSagaAction(SagaMessageActionType sagaActionType, ISagaMessage message, Action action, State state = null)
+		{
+			var messageAction = new MessageAction(sagaActionType, message, action);
+			messageAction.State = state;
+			this.MessageActions.Add(messageAction);
+		}
+	}
+}

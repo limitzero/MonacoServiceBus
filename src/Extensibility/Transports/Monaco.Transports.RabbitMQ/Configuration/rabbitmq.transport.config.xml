@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<!-- add the section below inside of the 'message.bus' element to configure RabbitMQ  -->
+<rabbitmq.transport>
+	
+	<!-- user that will connect to the server -->
+	<user.name></user.name>
+
+	<!-- user password that will be used to connect to the server -->
+	<user.password></user.password>
+
+	<!-- name of the server process that will host the exhange for queues -->
+	<host.name></host.name>
+
+	<!-- name of the location that will server as the routing point for a collection of queues. -->
+	<exchange.name></exchange.name>
+
+	<!-- port that the exchange will listen to for messages. [port 8080 is the default] -->
+	<port></port>
+
+	<!-- textual version of the available protocols for AMQP ("AMQP_0_8", "AMQP_0_8_QPID", "AMQP_0_9" or "AMQP_0_9_1" [AMQP_0_9_1 is the default]-->
+	<protocol></protocol>
+	
+</rabbitmq.transport>

@@ -1,0 +1,95 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{B1347F5E-FDAE-488F-9543-8525AA69EDDD}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Monaco.Modelling</RootNamespace>
+    <AssemblyName>Monaco.Modelling</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AbstractBusinessProcessModel.cs" />
+    <Compile Include="AbstractBusinessProcessModelLibrary.cs" />
+    <Compile Include="BusinessModel\Actions\CompleteAction.cs" />
+    <Compile Include="BusinessModel\Actions\ExecuteTaskAction.cs" />
+    <Compile Include="BusinessModel\Actions\IModelAction.cs" />
+    <Compile Include="BusinessModel\Actions\WaitForActivityAction.cs" />
+    <Compile Include="BusinessModel\Actions\WhenAction.cs" />
+    <Compile Include="BusinessModel\BusinessServiceDefinition.cs" />
+    <Compile Include="BusinessModel\BusinessServiceProcessStage.cs" />
+    <Compile Include="AbstractBusinessCapabilityModel.cs" />
+    <Compile Include="BusinessModel\Capabilities\BusinessCapability.cs" />
+    <Compile Include="BusinessModel\Capabilities\BusinessCapabilityDefinition.cs" />
+    <Compile Include="BusinessModel\Capabilities\BusinessServiceLevelExpectation.cs" />
+    <Compile Include="BusinessModel\Elements\Activity.cs" />
+    <Compile Include="BusinessModel\Elements\Actor.cs" />
+    <Compile Include="BusinessModel\Elements\Application.cs" />
+    <Compile Include="BusinessModel\Elements\Capability.cs" />
+    <Compile Include="BusinessModel\Elements\CapabilityScore.cs" />
+    <Compile Include="BusinessModel\Elements\Cost.cs" />
+    <Compile Include="BusinessModel\Elements\IModelElement.cs" />
+    <Compile Include="BusinessModel\Elements\Message.cs" />
+    <Compile Include="BusinessModel\Elements\ProcessingState.cs" />
+    <Compile Include="BusinessModel\Elements\Task.cs" />
+    <Compile Include="BusinessModel\IBusinessProcessModel.cs" />
+    <Compile Include="BusinessModel\IModel.cs" />
+    <Compile Include="BusinessModel\Internals\BusinessProcessModel.cs" />
+    <Compile Include="BusinessModel\Internals\BusinessProcessModelAction.cs" />
+    <Compile Include="BusinessModel\Internals\BusinessProcessModelActionType.cs" />
+    <Compile Include="BusinessModel\Internals\BusinessProcessModelStages.cs" />
+    <Compile Include="BusinessModel\Internals\BusinessProcessModelTriggerCondition.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Realization\IRealizer.cs" />
+    <Compile Include="Realization\ServiceModelMessageRealizer.cs" />
+    <Compile Include="Realization\ServiceModelSagaDataRealizer.cs" />
+    <Compile Include="Realization\ServiceModelStateMachineRealizer.cs" />
+    <Compile Include="Verbalizer\BusinessProcessModelVerbalizer.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Monaco\Monaco.csproj">
+      <Project>{2CAD4D0B-EB3D-4575-9809-3EB0BB0E23AC}</Project>
+      <Name>Monaco</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

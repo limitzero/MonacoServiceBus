@@ -1,0 +1,24 @@
+﻿<hibernate-mapping xmlns="urn:nhibernate-mapping-2.2"
+                   assembly="Monaco"
+                   namespace="Monaco.Bus.Entities"
+                   default-lazy="false">
+
+	<!-- entity: TimeoutInstance -->
+	<class name="Timeout" table="Timeouts">
+
+		<id name="Id" column="Id" type="System.Guid" >
+			<generator class="assigned" />
+		</id>
+
+		<!-- properties for entity 'Timeout' -->
+		<property name="CreatedOn" column="createdOn" type="System.DateTime"  not-null="false" />
+		<property name="ModifiedOn" column="modifiedOn" type="System.DateTime" not-null="false" />
+		<property name="Invocation" column="invocationAt" type="System.DateTime" index="idx_timeout_invocation"/>
+		<property name="Message" column="messageName" type="String" length="500" />
+		<property name="Instance" column="instance" type="System.Byte[]" length="8500"  />
+		<property name="RequestorId" column="requestorId" type="System.Guid" length="255" not-null="false" />
+		<property name="Requestor" column="requestor" type="String" length="500"  />
+		<property name="Endpoint" column="endpoint" type="String" length="500" index="idx_timeout_endpoint"/>
+	</class>
+
+</hibernate-mapping>

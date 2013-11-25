@@ -1,0 +1,174 @@
+﻿Idea:  
+Would like to have a simple fault management system to record when a message can not be processed that
+can be configured on the endpoint for the bus.
+
+Ex:
+
+public class EndpointConfiguration : BaseEndpointConfiguration
+{
+	public override ConfigureEndpoint()
+	{
+		// creates a custom set of fault handlers for a message:
+		ConfigureFaultHandlerFor<Message>()
+			.With<MyDBMessageFaultHandler>()
+			.With<MyLogFileMessageFaultHandler>();
+	}
+}
+
+
+Fault Handler System:
+
+[Serializable]
+public class FaultMessage : IMessage
+{
+	string Endpoint {get; set;}
+	IMessge Message {get; set;}
+	string Exception {get; set;}
+}
+
+// contract for all fault handlers:
+public interface IFaultHandler<TMessage> where TMessage : IMessage
+{
+	// handles the current fault:
+	void HandleFault(FaultMessage faultMessage);
+}
+
+
+Here is how it would work:
+
+1. The message would be taken from the endpoint and sent to the bus. 
+2. The bus would determine which components are able to handle the 
+current message and deliver it to them
+3. If an error occurs and the retry period has been exhausted for the message, 
+the fault handler(s) for the component would be used to handle the message
+4. If no fault handlers are defined for the component, then it will be pushed to the normal 
+error location.
+
+Changes:
+
+public interface ITransport
+{
+    event Action<IMessage, Exception> OnReceiveError;
+}
+
+public abstract class AbstractTransport : ITransport
+{
+	public event Action<IMessage, Exception> OnTransportError;
+
+		private void ReceiveWithTransaction()
+		{
+			// set the transaction up for concurrent reads:
+			TransactionOptions options = new TransactionOptions();
+			options.IsolationLevel = System.Transactions.IsolationLevel.RepeatableRead;
+			ITransportMessage message = null;
+
+			using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, options))
+			{
+				try
+				{
+					OnTransportReceiveStarted();
+
+					message = this.Receive();
+
+					if (message != null)
+					{
+						message.Endpoint = this.EndpointUri;
+						OnTransportMessageReceived(message);
+					}
+
+					scope.Complete();
+				}
+				catch (Exception exception)
+				{
+					if (this.HasExeceededRetryAttempts(message) == true)
+					{
+						this.PushToErrorEndpoint(message, exception);
+						OnTransportReceiveError(message, exception);
+						scope.Complete();
+					}
+					else
+					{
+						throw;	
+					}
+				}
+				finally
+				{
+					OnTransportReceiveCompleted(message);
+				}
+
+			}
+		}
+
+		private void OnTransportReceiveError(ITransportMessage message, Exception exception)
+		{
+			var evt = this.OnReceiveError;
+			if(evt != null)
+			  evt(message, exception);
+		}
+}
+
+
+
+public class ServiceBus : IServiceBus
+{
+	
+	public void Start()
+	{
+		this.Transport.OnErrorReceived += ProcessErrorViaFaultHandlers;
+	}
+	...
+
+	private void ProcessErrorViaFaultHandlers(ITransportMessage message, Exception exception)
+	{
+		// must get the representative message from the stream:
+		var message = this.Find<ISerializationProvider>().Deserialize(message.Stream) as IMessage;
+
+		// process the message via all of the fault handlers:
+		var faultProcessor = this.Find<IFaultHandlerProcessor>();
+		faultProcessor.ProcessFaults(message, exception);	
+	}
+
+}
+
+public interface IFaultProcessor
+{
+	void Process<TMessage>(TMessage message, Exception exception = null) where TMessage : IMessage;
+}
+
+public class FaultProcessor : IFaultProcessor
+{
+	private IKernel _kernel; 
+
+	public FaultProcessor(IKernel kernel)
+	{
+		_kernel = kernel;
+	}
+
+	public void Process<TMessage>(TMessage message, Exception exception = null)
+	 where TMessage : IMessage
+	{
+		var faultHandlers = _kernel.ResolveAll(typeof(IFaultHandler<TMessage>));
+
+		var faultMessage = new FaultMessage
+		{
+			Endpoint = _kernel.Resolve<ITransport>().EndpointUri;
+			Message = message, 
+			Exception = exception == null ? string.Empty : exception.ToString();
+		}
+
+		// excercise all of the fault handlers for the message:
+		foreach(var faultHanlder in faultHandlers)
+		{
+			try
+			{
+				faultHanlder.HandleFault(faultMessage);
+			}
+			catch(Exception exception)
+			{
+				// log the error for the fault handler and continue:
+				continue:
+			}
+		}		
+	}
+}
+

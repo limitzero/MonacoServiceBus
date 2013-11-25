@@ -1,0 +1,33 @@
+﻿
+-- state machine DSL ( credit to MassTransit project !!!)
+
+	  Initially
+	  (
+	    When(event)
+	 	      .Publish()
+	 	      .Send()
+	 	      .Reply()
+	 	      .Delay()
+	 	      .Complete()
+	 	      .TransitionTo(<some state>)
+	  ),
+	  
+	  While
+	  (<some state>,
+	    When(event)
+	 	      .Publish()
+	 	      .Send()
+	 	      .Reply()
+	 	      .Delay()
+	 	      .Complete()
+	 	      .TransitionTo(<some state>)
+	  )
+	  
+-- verbalize state machine:
+	   
+	  Initially when (message arrives) it will {call the appropriate code} and 
+	     [publish, send, reply, delay, complete] and/or transition to [state]
+	  
+	  Then [state] is triggered and when (message arrives) it will {call the appropriate code} and 
+	     [publish, send, reply, delay, complete] and/or transition to [state]
+	 

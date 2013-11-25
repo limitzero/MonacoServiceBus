@@ -1,0 +1,35 @@
+﻿Monaco :  A local implementation of a service bus 
+
+The idea for this implementation came from the following sources with a little adaptation:
+
+Udi Dahan - NServiceBus http://www.nservicebus.org (the orginal source and motivation to do this)
+Dru Sellers & Chris Patterson - MassTransit (http://www.github.com/masstransit) (their implementation of the "Saga" pattern is sheer genius)
+Oren Eni - Rhino.ServiceBus (http://www.github.com/rhino.servicebus) (conciseness and simplicity)
+
+Credits:
+xml serlaization - http://www.sharpserializer.com (extended to allow for interfaces to be serialized via proxy classes)
+Castle Project - www.castleproject.org
+NHibernate - www.nhforge.org
+C# Web Server - www.codeplex.com (deprecated)
+
+Features:
+- Console web page for administering individual bus service instances. 
+- Contrib library to model capabilities and realize them through services as saga state machines.
+- Contrib library to visualize saga state machines for documentation purposed via GraphViz or VS Directed Graph
+- Fluent test fixture for unit testing state machines
+- Modules for hosting components in the life-cycle of the service bus
+- Code tasks that can be scheduled creating messages for consumption by the service bus.
+- Verbalization of all complex lon-running processes (i.e. "saga")
+ through a state machine syntax through simple textual statements 
+as well as unit testing through textual description of test case
+
+Still rough but does a lot, enjoy :)
+
+Rendering a FSM using quick graph:
+http://www.pedautreppe.com/post/How-to-render-a-finite-state-machine-graph-in-ASPNET-.aspx
+
+Web Portal for Monitoring (http://dropthings.omaralzabir.com/ )
+http://www.codeproject.com/KB/ajax/MakingGoogleIG.aspx
+http://stevencalise.wordpress.com/2009/09/15/wpf-dashboard-and-custom-panels/
+
+

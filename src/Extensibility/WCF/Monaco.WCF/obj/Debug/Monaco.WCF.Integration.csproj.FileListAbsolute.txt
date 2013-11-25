@@ -1,0 +1,2 @@
+C:\repositories\Monaco\build\Monaco.WCF.Integration.dll
+C:\repositories\Monaco\build\Monaco.WCF.Integration.pdb

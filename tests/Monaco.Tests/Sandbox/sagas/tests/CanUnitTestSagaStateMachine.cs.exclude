@@ -1,0 +1,157 @@
+using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
+
+using Monaco.Sagas.StateMachine;
+using Rhino.Mocks;
+using Xunit;
+
+namespace Monaco.Tests.Sandbox.sagas.tests
+{
+	/*
+	 * Want to use something like the syntax to develop the 
+	 * state machine in the unit test.
+	 * 
+	 * Initially(
+	 *			When(()=> saga.Consume(...))
+	 *			 .ExpectToPublish<...>( m => m)
+	 *			 .ExpectToTransitionTo<...>()
+	 *			 .ExpectToComplete()
+	 *			 )
+	 *	
+	 * While(saga.State, 
+	 *		When(()=> saga.Consume(...))
+	 *		      .ThenDo(()=> some custom code for When())
+	 *			  .ExpectToPublish<...>( m => m)
+	 *			  .ExpectToTransitionTo<...>()
+	 *			  .ExpectToComplete()
+	 *	)
+	 *	
+	 * Assert.IsTrue(saga.IsComplete);
+	 * 
+	 * 
+	 */
+	public class CanUnitTestSagaStateMachine : SagaStateMachineTestFixure<UnitTestSaga>
+	{
+		private UnitTestSaga _saga;
+
+		public Event<UnitTestMessage1> Started { get; set; }
+
+		public CanUnitTestSagaStateMachine()
+		{
+			_saga = PrepareStateMachine();
+		}
+
+		[Fact]
+		public void can_test_unit_test_dsl()
+		{
+			var message = new UnitTestMessage1();
+
+			//Initially(
+			//    When(() => new UnitTestMessage1())
+			//        .ExpectToPublish(() => new UnitTestMessage2())
+			//        .ExpectTransitionTo<UnitTestSaga.WaitingForThirdMessage>()
+			//    );
+
+			//Assert.IsType<UnitTestSaga.WaitingForThirdMessage>(_saga.CurrentState);
+			//Assert.False(_saga.IsCompleted);
+		}
+	}
+
+	public class UnitTestSaga : SagaStateMachine,
+		StartedBy<UnitTestMessage1>,
+		OrchestratedBy<UnitTestMessage3>
+	{
+		public Event<UnitTestMessage1> FirstMessageArrived { get; set; }
+		public Event<UnitTestMessage3> SecondMessageArrived { get; set; }
+
+		public State WaitingForThirdMessage { get; set; }
+		public State WaitingForMessage { get; set; }
+
+		public UnitTestSaga()
+		{
+
+		}
+
+		public override void Define()
+		{
+			Initially(
+				When(FirstMessageArrived)
+				.Publish<UnitTestMessage2>(m => m.Id = 1)
+				.TransitionTo(WaitingForThirdMessage));
+
+			While(WaitingForThirdMessage,
+				When(SecondMessageArrived)
+						.Publish<UnitTestMessage2>(m => m.Id = 1)
+						.Complete());
+		}
+
+		public void Consume(UnitTestMessage1 message)
+		{
+
+		}
+
+		public void Consume(UnitTestMessage3 message)
+		{
+
+		}
+	}
+
+	public class UnitTestMessage2 : IMessage
+	{
+		public int Id { get; set; }
+		public Guid CorrelationId { get; set; }
+	}
+
+	public class UnitTestMessage1 : IMessage
+	{
+		public int Id { get; set; }
+		public Guid CorrelationId { get; set; }
+	}
+
+	public class UnitTestMessage3 : IMessage
+	{
+		public Guid CorrelationId { get; set; }
+	}
+
+	public class StateMachineScenarios
+	{
+		private List<Action> _actions;
+		private readonly MockRepository _mockRepository;
+		private readonly IServiceBus _serviceBus;
+		private readonly SagaStateMachine _sagaStateMachine;
+
+		public StateMachineScenarios(MockRepository mockRepository,
+			IServiceBus serviceBus,
+			SagaStateMachine sagaStateMachine)
+		{
+			_mockRepository = mockRepository;
+			_serviceBus = serviceBus;
+			_sagaStateMachine = sagaStateMachine;
+			this._actions = new List<Action>();
+		}
+
+		public void Initially(SagaUnitTestEventTriggerCondition configuration)
+		{
+
+		}
+
+		public SagaUnitTestEventTriggerCondition When(Action action)
+		{
+			return new SagaUnitTestEventTriggerCondition(_sagaStateMachine, _serviceBus, action);
+		}
+
+		public StateMachineScenarios ExpectToPublish<TMessage>(Func<TMessage, TMessage> publish)
+			where TMessage : IMessage, new()
+		{
+			var message = publish(new TMessage());
+
+			_sagaStateMachine.Bus.Publish(message);
+			LastCall.Repeat.AtLeastOnce()
+				.Message(string.Format("The saga should publish the message '{0}'", typeof(TMessage).FullName));
+
+			return this;
+		}
+
+	}
+}

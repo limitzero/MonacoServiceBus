@@ -1,0 +1,119 @@
+﻿Need a way to configure the pipeline for the transport: (is this too complicated, what about simplicity???)
+
+Configure<MsmqTransport>(
+	.ReceivePipeline<MsmqInboundPipeline>(
+		Filter<DeserializationFilter>)
+	.SendPipeline<MsmqSendPipeline>(
+		Filter<SerializationFilter>)
+	)
+
+
+public class MsmqPipelineManagerConfiguration : 
+	BasePipelineConfiguration<MsmqTransport>
+{
+	public void override Configure()
+	{
+		BuildReceivePipeline(
+			HavingFilters(
+				Filter<DeserlizationFilter>());
+
+		BuildSendPipeline(
+			HavingFilters(
+				Filter<SerializationFilter>());
+		)
+	}
+}
+
+
+
+public abstract class BasePipelineManagerConfiguration<TTransport>
+	where TTransport : BaseTransport
+{
+	private ICollection<Type> receiveFilters;
+
+	public BasePipelineManager PipelineManager {get; private set:}
+
+	protected void BuidReceivePipeline(string name, params Type[] filters)
+	{
+		var receivePipeline = kernel	
+	}
+
+	protected Type Filter<TFilter> where TFilter : BasePipelineFilter
+	{
+		return typeof(TFilter);
+	}
+}
+
+IDEA#2: Getting the messages from the message store to via the transports:
+
+msg store -> transport.Receive() -> msg -> ???
+
+Now we need to do something with the underlying message if it is not in a normalized fashion
+- Will this be an EAI transformation to process a resultant message
+- Will the message just pass through unaltered and process as-is
+- What about crossing the divide between an ESB and an EAI platform (why try to do both
+- How easy will the api be to interact with, if this is complicated then it just becomes a well intentioned complex software that just gives 
+everyone a headache....
+
+How can I have an api that is easy to work with an minimal configuration to get started
+
+
+
+
+A. Writing a transport implementation
+
+1. create a registration for the endpoint and transport with an endpoint registration
+
+Ex:
+
+public interface IEndpointRegistration
+{
+	// retrieves the current scheme for the endpoint registration
+	string Scheme {get;}
+
+	// check the current uri to see if it matches the registered endpoint
+	// uri by comparing uri schemes:
+	bool IsMatch(Uri endpoint);
+}
+
+
+public interface IEndpointFactory
+{
+	// this will build an instance of the transport 
+	// with the associated endpoint reference orientated
+	// to the message storage location (the factory
+	// will keep a cache of all endpoint registrations
+	// for quicker creation)
+	ITransport Build(Uri endpoint);
+}
+
+Ex: sending a message
+
+public void Send(IMessage message)
+{
+	// this is sending the message to the 
+	// endpoint assigned to the bus instance:
+
+	// get an instance of the factory 
+	// and ask it to create a transport (based on 
+	// current bus endpoint)
+	var factory = new EndpointFactory();
+	var transport = factory.Build(this.Endpoint.EndpointUri);
+
+	// send the message to the storage location
+	// using any custom pipelines for processing:
+	transport.Send(message);	
+}
+
+public void Send(Uri endpoint, params[] IMessage messages)
+{
+	// get an instance of the factory 
+	// and ask it to create a transport (based on 
+	// current bus endpoint)
+	var factory = new EndpointFactory();
+	var transport = factory.Build(endpoint);
+
+	// send the message to the storage location
+	// using any custom pipelines for processing:
+	transport.Send(message);	
+}

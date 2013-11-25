@@ -1,0 +1,223 @@
+﻿want to create a distributor for load-balancing requests across a series of endpoints
+
+Ex: configuration
+
+<fabric>
+
+	<!-- a node is equivalent to one instance of a service bus -->
+	<node endpoint="msmq://localhost/load.balanced.endpoint">
+		<cell endpoint="msmq://localhost/load.worker1"/>
+		<cell endpoint="msmq://localhost/load.worker2"/>
+		...
+	</node>
+
+	<!-- a node is equivalent to one instance of a service bus -->
+	<node endpoint="msmq://localhost/load.balanced.endpoint">
+		<cell endpoint="msmq://localhost/load.worker1"/>
+		<cell endpoint="msmq://localhost/load.worker2"/>
+		...
+	</node>
+
+</fabric>
+
+The consumer/producer pattern looks attractive here, but I need load balancing across the cells (i.e. "workers")
+
+
+public class Distributor
+{
+  readonly object _locker = new object();
+  Thread[] _workers;
+  Queue<Action> _itemQ = new Queue<Action>();
+ 
+  public PCQueue (int workerCount)
+  {
+    _workers = new Thread [workerCount];
+ 
+    // Create and start a separate thread for each worker
+    for (int i = 0; i < workerCount; i++)
+      (_workers [i] = new Thread (Consume)).Start();
+  }
+ 
+  public void Shutdown (bool waitForWorkers)
+  {
+    // Enqueue one null item per worker to make each exit.
+    foreach (Thread worker in _workers)
+      EnqueueItem (null);
+ 
+    // Wait for workers to finish
+    if (waitForWorkers)
+      foreach (Thread worker in _workers)
+        worker.Join();
+  }
+ 
+  public void EnqueueItem (Action item)
+  {
+    lock (_locker)
+    {
+      _itemQ.Enqueue (item);           // We must pulse because we're
+      Monitor.Pulse (_locker);         // changing a blocking condition.
+    }
+  }
+ 
+  void Consume()
+  {
+    while (true)                        // Keep consuming until
+    {                                   // told otherwise.
+      Action item;
+      lock (_locker)
+      {
+        while (_itemQ.Count == 0) Monitor.Wait (_locker);
+        item = _itemQ.Dequeue();
+      }
+      if (item == null) return;         // This signals our exit.
+      item();                           // Execute item.
+    }
+  }
+}
+
+
+Could do something like this:
+
+// the 'node' holds the collection of workers that should be able to be load-balanced
+public class Node
+{
+	ICollection<Worker> workers;
+
+	// this will take the message and enqueue it for 
+	// distribution among the workers:
+	public void Enqueue(IEnvelope envelope)
+	{
+		var worker = this.GetNextAvailableWorker();
+	}
+
+}
+
+
+public class AllocateNextWorkerPolicyChain : IPolicy
+{
+	Queue<IPolicy> policies;
+
+	public AllocateNextWorkerPolicyChain()
+	{
+	    this.policies = new Queue<IPolicy>();
+		this.LoadPolicies();
+	}
+
+	public Worker Execute(ICollection<Worker> workers)
+	{
+		Worker nextWorker; 
+	}
+
+	private void LoadPolicies()
+	{
+		this.LoadPolicy<MaximunHitToMissRatioPolicy>();
+		this.LoadPolicy<LeastTimeToProcessPolicy>();
+		this.LoadPolicy<ResolveMultipleWorkerSelectionPolicy>();
+	}
+
+	private void LoadPolicy<TPolicy>() where TPolicy : class, IPolicy, new()
+	{
+		var policy = new TPolicy();
+		this.policies.Enqueue(policy);
+	}
+}
+
+
+
+public class Worker
+{
+	// how many times has the worker been selected?
+	public int HitCount {get; set;}
+
+	// how many times has the worker been overlooked?
+	public int MissCount {get; set;}
+
+	// how many requests has the worker handled?
+	public int HandledRequests {get; set;}
+
+	// what is the average time to complete the request?
+	public decimal TimeToCompleteRequest {get; set;}
+}
+
+Q: What is the key algorithm for getting the next available worker
+
+public interface IPolicy
+{
+	Worker Execute(ICollection<Worker> workers);
+}
+
+public interface IPolicySpecification : IPolicy
+{
+	//gets the set of 
+	ICollection<Worker> Matches {get;}
+
+	// gets or sets the specification to look for in the policy
+	// when it is executed over the collection of workers:
+	Func<Worker, bool> IsMatch {get; set;}
+}
+
+
+// simple
+public class LeastTimeToProcessPolicy : IPolicy
+{
+	public Worker Execute(ICollection<Worker> workers)
+	{
+		var worker = (from item in workers 
+							 order by item.TimeToCompleteRequest desc
+							 select item).FirstOrDefault();
+		return worker;
+	}
+}
+
+// keep workers at least 75% hit/miss ratio
+public class MaximunHitToMissRatioPolicy : IPolicySpecification
+{
+	public MaximunHitToMissRatioPolicy()
+	{
+		decimal HitToMissRatio = 0.75D;
+
+		// keep the rate around 75%:
+		this.IsMatch = (worker)=> this.IsHit(worker);
+	}
+
+	private bool IsHit(Worker worker)
+	{
+	    bool isHit = false;
+
+		if(worker.HitRate > 0 && worker.MissRate > 0)
+		{
+			 var rate = ((decimal)worker.HitRate) /((decimal)worker.MissRate)
+			 isHit = Decimal.Compare(HitToMissRatio, rate) > 0;
+		}
+
+		return isHit:
+	}
+}
+
+// ok what if there is a tie on multiples?
+public class ResolveMultipleWorkerSelectionPolicy : IPolicySpecification
+{
+	// choose the one with the lowest hit to time-to-complete ratio
+}
+
+
+IDEA #2: Simple weighted worker pool
+
+Pool ( msmq://localhost.pool) with n requests per endpoint in the pool 
+Endpoint A (msmq://localhost.endpoint.a)   ( WEIGHT = 50)
+Endpoint B (msmq://localhost.endpoint.b)   ( WEIGHT = 10)
+Endpoint C (msmq://localhost.endpoint.a)   ( WEIGHT = 40)
+
+or can determine weight by random factor 
+
+(where n = number of workers in pool)
+
+WEIGHT = (RANDOM(1...n)/n) * 10 where n = number of workers in pool
+
+and we can determine requests by random factor (if not stated)
+
+REQUESTS = (n/RANDOM(1...n)  - 1) * 100
+
+Ex:
+
+Endpoint A : (WEIGHT = (2/3) * 10 = 63%, REQUESTS = ((3/2) - 1) * 100 = 50

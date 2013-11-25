@@ -1,0 +1,224 @@
+﻿using System;
+using System.Linq;
+using System.Reflection;
+using Castle.Core;
+using Castle.MicroKernel;
+using Castle.MicroKernel.Registration;
+using Monaco.Bus;
+using Monaco.Bus.Internals;
+using Monaco.Bus.Internals.Reflection;
+using Monaco.Bus.MessageManagement.MessageHandling.Dispatching.ToStateMachine;
+using Monaco.Bus.MessageManagement.Serialization;
+using Monaco.Infrastructure.Logging;
+using Monaco.Infrastructure.Logging.Impl;
+using Monaco.Persistance.Repositories;
+using Monaco.Persistance.Sagas;
+using Monaco.Sagas;
+using Monaco.Sagas.StateMachine;
+using Monaco.Sagas.StateMachine.Verbalizer;
+using Rhino.Mocks;
+
+namespace Monaco.Testing.StateMachines
+{
+	/// <summary>
+	/// Unit test fixture for testing sagas against expectations.
+	/// </summary>
+	/// <typeparam name="TSaga">Type of the saga to unit test.</typeparam>
+	public class SagaStateMachineUnitTestFixture<TSaga> : IDisposable
+		where TSaga : SagaStateMachine
+	{
+		private MockRepository _mocks = null;
+		private Action _consume;
+		private SagaStateMachineUnitTestExpectation _expectation;
+		private ISagaMessage _message;
+		private Guid _correlationId; 
+
+		// collaborators:
+		private IKernel _kernel;
+		private IServiceBus _messageBus;
+
+		// subject under test:
+		private TSaga _saga;
+
+		/// <summary>
+		/// This will prepare the saga state machine for testing under the current user-defined scenario.
+		/// </summary>
+		/// <returns></returns>
+		protected TSaga PrepareSagaStateMachine()
+		{
+			_mocks = new MockRepository();
+			_correlationId = Guid.NewGuid();
+
+			// collaborators (need this for component logging):
+			_messageBus = _mocks.DynamicMock<IServiceBus>();
+
+			_kernel = new DefaultKernel();
+			_kernel.Register(Component.For<ILogger>().ImplementedBy<NullLogger>());
+			_kernel.Register(Component.For<ISagaStateMachineMessageDispatcher>().ImplementedBy<SagaStateMachineMessageDispatcher>());
+			_kernel.Register(Component.For<IReflection>().ImplementedBy<DefaultReflection>());
+			_kernel.Register(Component.For<ISerializationProvider>().ImplementedBy<SharpSerializationProvider>());
+			_kernel.AddComponent(typeof(ISagaRepository<,>).Name, typeof(ISagaRepository<,>),
+					typeof(InMemorySagaRepository<,>), LifestyleType.Singleton);
+
+			_kernel.Register(Component.For<IServiceBus>().Instance(_messageBus));
+			_kernel.Register(Component.For<TSaga>());
+
+			// subject under test:
+			_saga = _kernel.Resolve<TSaga>();
+
+			_saga.InstanceId = _correlationId;
+
+			SetSagaData(_saga, _correlationId);
+
+
+			try
+			{
+				System.Diagnostics.Debug.WriteLine(new SagaStateMachineVerbalizer().Verbalize(_saga));
+			}
+			catch
+			{
+			}
+
+			return this._saga;
+		}
+
+		public void Dispose()
+		{
+			if (_kernel != null)
+				_kernel.Dispose();
+
+			_kernel = null;
+			_mocks = null;
+			_consume = null;
+			_messageBus = null;
+			_expectation = null;
+		}
+
+		/// <summary>
+		/// This will setup the test scenario for a saga for consuming a message.
+		/// </summary>
+		/// <param name="expectation"></param>
+		public void ForSagaStateMachine(SagaStateMachineUnitTestExpectation expectation)
+		{
+			this._expectation = expectation;
+
+			using (_mocks.Record())
+			{
+				// check assertions:
+				foreach (var action in this._expectation.Actions)
+					action();
+			}
+
+			using (_mocks.Playback())
+			{
+				// consume the message:
+				_consume();
+
+				_expectation.PostConditions.ForEach(x => x());
+
+				//AssertPostConditions();
+			}
+
+		}
+
+		/// <summary>
+		/// This is the trigger condition to start the process of the message consumer 
+		/// processing the current message.
+		/// </summary>
+		/// <typeparam name="TMessage">Message to consume</typeparam>
+		/// <param name="event"></param>
+		/// <param name="action"></param>
+		/// <returns></returns>
+		public SagaStateMachineUnitTestExpectation UponReceivingEvent<TMessage>(Event<TMessage> @event, 
+			Action<TMessage> action)
+			where TMessage : class, ISagaMessage, new()
+		{
+			var message = this.CreateMessage<TMessage>();
+			action(message);
+
+			// auto-correlate messages (to not trigger correlation exceptions in testing):
+			message.CorrelationId = _correlationId;
+
+			this._message = message;
+
+			IEnvelope envelope = new Envelope(message);
+
+			this._consume = () =>
+			{
+				_kernel.Resolve<ISagaStateMachineMessageDispatcher>()
+					.Dispatch(this._messageBus, this._saga, envelope);
+			};
+
+			return new SagaStateMachineUnitTestExpectation(this._saga, ref this._messageBus);
+		}
+
+		private  void AssertPostConditions()
+		{
+			this._expectation.AssertThatStateWasChanged();
+			this._expectation.AssertThatStateMachineCompleted();
+		}
+
+		private TMessage CreateMessage<TMessage>()
+		{
+			var message = default(TMessage);
+
+			if (typeof(TMessage).IsInterface)
+			{
+				message = DefaultReflection.CreateMessage<TMessage>();
+			}
+			else
+			{
+				message = (TMessage)typeof(TMessage).Assembly.CreateInstance(typeof(TMessage).FullName);
+			}
+
+			return message;
+		}
+
+		private void SetSagaData(TSaga saga, Guid instanceId)
+		{
+			if (this.ContainsInterface(saga, typeof(SagaStateMachine<>)) != null)
+			{
+				// need to instantiate new data for saga and sync the instance 
+				// identifier with the instance identifier of the saga (testing of course):
+				PropertyInfo theSagaDataProperty = this.GetSagaDataProperty(saga);
+
+				if (theSagaDataProperty == null) return;
+
+				IReflection reflection = new DefaultReflection(_kernel);
+				ISagaData theData = reflection.BuildInstance(theSagaDataProperty
+					.PropertyType.AssemblyQualifiedName) as ISagaData;
+
+				if (theData != null)
+				{
+					theData.CorrelationId = instanceId;
+					theSagaDataProperty.SetValue(saga, theData, null);
+				}
+			}
+		}
+
+		private PropertyInfo GetSagaDataProperty(object theSaga)
+		{
+			PropertyInfo theDataProperty = null;
+
+			if (this.ContainsInterface(theSaga, typeof(SagaStateMachine<>)) != null)
+			{
+				theDataProperty = (from property in theSaga.GetType().GetProperties()
+								   where typeof(ISagaData).IsAssignableFrom(property.PropertyType)
+								   select property).FirstOrDefault();
+			}
+
+			return theDataProperty;
+		}
+
+		private Type ContainsInterface(object theComponent, Type interfaceType)
+		{
+			Type theInterface = (from contract in theComponent.GetType().GetInterfaces()
+								 where contract.IsGenericType == true
+									   &&
+									   contract.FullName.StartsWith(interfaceType.FullName)
+								 select contract).FirstOrDefault();
+
+			return theInterface;
+		}
+	}
+}

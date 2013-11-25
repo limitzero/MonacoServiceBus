@@ -1,0 +1,21 @@
+﻿<hibernate-mapping xmlns="urn:nhibernate-mapping-2.2"
+                   assembly="Monaco"
+                   namespace="Monaco.Subscriptions.Impl"
+                   default-lazy="false">
+
+  <!-- entity: Subscription -->
+  <class name="Subscription" table="Subscriptions">
+
+    <id name="Id" column="Id" type="System.Guid" >
+      <generator class="assigned" />
+    </id>
+
+    <!-- properties for entity 'Subscription' -->
+    <property name="IsActive" column="isActive"  />
+    <property name="Uri" column="endpoint" type="String"  length="500" index="idx_subscription_message_and_uri"/>
+    <property name="Component" column="componentName" type="String" length="500"  />
+    <property name="Message" column="messageName" type="String" length="500" index="idx_subscription_message_and_uri"  />
+
+  </class>
+
+</hibernate-mapping>

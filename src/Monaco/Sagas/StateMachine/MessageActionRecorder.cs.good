@@ -1,0 +1,211 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Castle.MicroKernel;
+using Monaco.Bus.Internals.Reflection;
+using Monaco.Exceptions;
+
+namespace Monaco.Sagas.StateMachine
+{
+	public class MessageActionRecorder : IMessageActionRecorder
+	{
+		private readonly bool _isInMockedState;
+		private readonly SagaStateMachine _stateMachine;
+		private readonly List<MessageAction> _messageActions;
+
+		public ICollection<MessageAction> MessageActions { get { return _messageActions; } }
+
+		public MessageActionRecorder(SagaStateMachine stateMachine)
+		{
+			_stateMachine = stateMachine;
+			this._messageActions = new List<MessageAction>();
+
+			if (_stateMachine.Bus != null && _stateMachine.Bus != null)
+			{
+				// if in mocked state, do not execute the bus actions for transmitting message:
+				_isInMockedState = _stateMachine.Bus.GetType().FullName.Contains("proxy");
+			}
+		}
+
+		public void Play(ISagaMessage message)
+		{
+			// Transistion, When and Correlate are performed by the dispatcher:
+			var actions = (from match in this.MessageActions
+						   where match.ActionType != SagaMessageActionType.Transition
+							&& match.ActionType != SagaMessageActionType.When
+							&& match.ActionType != SagaMessageActionType.Correlate
+						   select match).Distinct().ToList();
+
+			actions.ForEach(x => x.Action(message));
+		}
+
+		public void RecordConsumeAction<TMessage>(TMessage message)
+			where TMessage : class, ISagaMessage
+		{
+			Action<ISagaMessage> consumeAction = (sagaMessage) =>
+													{
+														((Consumes<TMessage>)_stateMachine).Consume((TMessage)sagaMessage);
+													};
+
+			var messageAction = new MessageAction(SagaMessageActionType.When, message, consumeAction);
+			this._messageActions.Add(messageAction);
+		}
+
+		public void RecordCorrelateAction<TMessage>(Func<TMessage, ISagaData, bool> correlate) 
+			where TMessage : class, ISagaMessage
+		{
+			var data = new DefaultReflection(new DefaultKernel()).GetProperty<ISagaData>(_stateMachine, "Data");
+
+			Action<ISagaMessage> correlateAction = (sagaMessage) =>
+			                                     	{
+			                                     		bool result = correlate(sagaMessage as TMessage, data);
+
+			                                     		if (!_isInMockedState && result == false)
+			                                     		{
+			                                     			throw new SagaMessageCouldNotBeCorrelatedToOngoingSagaException(
+			                                     				sagaMessage.GetType(),
+			                                     				_stateMachine.GetType());
+			                                     		}
+			                                     	};
+
+			var messageAction = new MessageAction(SagaMessageActionType.Correlate, null, correlateAction);
+			this._messageActions.Add(messageAction);
+		}
+
+		public void RecordDoAction<TMessage>(Action<TMessage> action)
+			where TMessage : class, ISagaMessage
+		{
+			Action<ISagaMessage> doAction = theMessage => action(theMessage as TMessage);
+			this._messageActions.Add(new MessageAction(SagaMessageActionType.Do, null, doAction));
+		}
+
+		public void RecordPublishAction<TMessage, TMessageToPublish>(Action<TMessage, TMessageToPublish> action,
+			TMessageToPublish messageToPublish)
+			where TMessage : class, ISagaMessage
+			where TMessageToPublish : class, IMessage
+		{
+			Action<ISagaMessage> publishAction = (sagaMessage) =>
+														{
+															action(sagaMessage as TMessage, messageToPublish);
+
+															if (!_isInMockedState)
+																_stateMachine.Bus.Publish(messageToPublish);
+														};
+
+			this._messageActions.Add(new MessageAction(SagaMessageActionType.Publish, messageToPublish, publishAction));
+		}
+
+		public void RecordSendAction<TMessage, TMessageToSend>(Action<TMessage, TMessageToSend> action,
+			TMessageToSend messageToSend)
+			where TMessage : class, ISagaMessage
+			where TMessageToSend : class, IMessage
+		{
+			Action<ISagaMessage> sendAction = (sagaMessage) =>
+			{
+				action(sagaMessage as TMessage, messageToSend);
+
+				if (!_isInMockedState)
+					_stateMachine.Bus.Send(messageToSend);
+			};
+			this._messageActions.Add(new MessageAction(SagaMessageActionType.Send, messageToSend, sendAction));
+		}
+
+		public void RecordSendToEndpointAction<TMessage, TMessageToSend>(Action<TMessage, TMessageToSend> action,
+			TMessageToSend messageToSend,
+			Uri endpoint)
+			where TMessage : class, ISagaMessage
+			where TMessageToSend : class, IMessage
+		{
+			Action<ISagaMessage> sendAction = (sagaMessage) =>
+			{
+				action(sagaMessage as TMessage, messageToSend);
+
+				if (!_isInMockedState)
+					_stateMachine.Bus.Send(endpoint, messageToSend);
+			};
+			this._messageActions.Add(new MessageAction(SagaMessageActionType.SendToEndpoint, messageToSend, sendAction) { Endpoint = endpoint.OriginalString });
+		}
+
+		public void RecordReplyAction<TMessage, TMessageToReplyWith>(Action<TMessage, TMessageToReplyWith> action,
+			TMessageToReplyWith messageToReplyWith)
+			where TMessage : class, ISagaMessage
+			where TMessageToReplyWith : class, IMessage
+		{
+			Action<ISagaMessage> replyAction = (sagaMessage) =>
+			{
+				action(sagaMessage as TMessage, messageToReplyWith);
+
+				if (!_isInMockedState)
+					_stateMachine.Bus.Reply(messageToReplyWith);
+			};
+			this._messageActions.Add(new MessageAction(SagaMessageActionType.Reply, messageToReplyWith, replyAction));
+		}
+
+		public void RecordDelayAction<TMessage, TMessageToDefer>(Action<TMessage, TMessageToDefer> action,
+			TMessageToDefer messageToDefer,
+			TimeSpan duration)
+			where TMessage : class, ISagaMessage
+			where TMessageToDefer : class, IMessage
+		{
+			Action<ISagaMessage> delayAction = (sagaMessage) =>
+			{
+				action(sagaMessage as TMessage, messageToDefer);
+
+				if (!_isInMockedState)
+					_stateMachine.Bus.HandleMessageLater(duration, messageToDefer);
+			};
+			this._messageActions.Add(new MessageAction(SagaMessageActionType.Delay, messageToDefer, delayAction) { Delay = duration });
+		}
+
+		public void RecordTransitionAction<TMessage>(State newState)
+				where TMessage : class, ISagaMessage
+		{
+			Action<ISagaMessage> transitionAction = (sagaMessage) =>
+														{
+															_stateMachine.MarkTransitionTo(newState);
+														};
+			this._messageActions.Add(new MessageAction(SagaMessageActionType.Transition, null, transitionAction) { State = newState });
+		}
+
+		public void RecordCompleteAction<TMessage>()
+			where TMessage : class, ISagaMessage
+		{
+			Action<ISagaMessage> completeAction = (sagaMessage) =>
+													{
+														_stateMachine.MarkTransitionTo(new EndState());
+														_stateMachine.MarkAsCompleted();
+													};
+			this._messageActions.Add(new MessageAction(SagaMessageActionType.Complete, null, completeAction));
+		}
+
+		private TMessage CreateMessage<TMessage>()
+		{
+			var message = default(TMessage);
+
+			if (typeof(TMessage).IsInterface)
+			{
+				if (!_isInMockedState)
+				{
+					message = _stateMachine.Bus.CreateMessage<TMessage>();
+				}
+				else
+				{
+					message = DefaultReflection.CreateMessage<TMessage>();
+				}
+			}
+			else
+			{
+				if (!_isInMockedState)
+				{
+					message = _stateMachine.Bus.Find<TMessage>();
+				}
+				else
+				{
+					message = (TMessage)typeof(TMessage).Assembly.CreateInstance(typeof(TMessage).FullName);
+				}
+			}
+
+			return message;
+		}
+	}
+}

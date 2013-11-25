@@ -1,0 +1,262 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{3C120E2B-CB48-4F18-A0A6-4ADD206DE91B}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Monaco.Tests</RootNamespace>
+    <AssemblyName>Monaco.Tests</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <FileUpgradeFlags>
+    </FileUpgradeFlags>
+    <OldToolsVersion>3.5</OldToolsVersion>
+    <UpgradeBackupLocation />
+    <PublishUrl>http://localhost/Monaco.Tests/</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Web</InstallFrom>
+    <UpdateEnabled>true</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>true</IsWebBootstrapper>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Castle.Core, Version=1.2.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\Castle.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.DynamicProxy2, Version=2.2.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\Castle.DynamicProxy2.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.MicroKernel, Version=2.1.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\Castle.MicroKernel.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.Windsor, Version=2.1.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\Castle.Windsor.dll</HintPath>
+    </Reference>
+    <Reference Include="Polenter.SharpSerializer, Version=2.6.0.0, Culture=neutral, PublicKeyToken=8f4f20011571ee5f, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\lib\Polenter.SharpSerializer.dll</HintPath>
+    </Reference>
+    <Reference Include="QuickGraph">
+      <HintPath>..\..\lib\QuickGraph.dll</HintPath>
+    </Reference>
+    <Reference Include="QuickGraph.Graphviz">
+      <HintPath>..\..\lib\QuickGraph.Graphviz.dll</HintPath>
+    </Reference>
+    <Reference Include="Rhino.Mocks, Version=3.1.0.584, Culture=neutral, PublicKeyToken=0b3305902db7183f, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\Rhino.Mocks.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Messaging" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Transactions" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="xunit, Version=1.5.0.1479, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\tools\xunit\xunit.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BitmapGeneratorDotEngine.cs" />
+    <Compile Include="Bus\Features\Configuration\ConfigurationSpike.cs" />
+    <Compile Include="Bus\Features\Faults\CanFireFaultHandlerForMessagesWithNoConsumer.cs" />
+    <Compile Include="Bus\Features\Faults\CanFireFaultHandlersForMessageWithException.cs" />
+    <Compile Include="Bus\Features\Modules\Messages\CanFireMessageModule.cs" />
+    <Compile Include="Bus\Features\Modules\Bus\CanHostModuleOverBusLifecycle.cs" />
+    <Compile Include="Bus\Features\StateMachine\CanMergeStateMachineDataWhenVersionsAreInConflictTest.cs" />
+    <Compile Include="Bus\Features\Tasks\CanScheduleTaskToProduceMessage.cs" />
+    <Compile Include="Bus\Features\Testing\Consumers\CanUseMessageConsumerTestFixtureForTestingMessageConsumer.cs" />
+    <Compile Include="Bus\Features\Transports\Virtual\CanUseBusToProcessMessagesOnVirtualEndpoints.cs" />
+    <Compile Include="Bus\Features\Message.Consumption\Timeouts\CanUseBusToProcessTimeoutMessageForConsumers.cs" />
+    <Compile Include="Bus\Features\SendReply\CanSendMessageAndGetReply.cs" />
+    <Compile Include="Bus\Features\Message.Consumption\Pipelining\CanUseBusToProcessMessagesByConfiguration.cs" />
+    <Compile Include="Bus\Features\Message.Consumption\Polymorphism\CanUseBusToProcessInterfaceBasedMessages.cs" />
+    <Compile Include="Bus\Features\StateMachine\CanProcessMessagesToSagaStateMachine.cs" />
+    <Compile Include="Bus\Features\SendPublish\CanSendMessagesToConsumers.cs" />
+    <None Include="Bus\Features\Sagas\CanSuspendActiveSaga.cs.exclude" />
+    <Compile Include="Bus\Features\Testing\StateMachines\CanUseSagaStateMachineTestFixtureForTestingSagaStateMachines.cs" />
+    <Compile Include="Bus\Features\WCF.Integration\CanSendMessageAndGetReplyUsingAsyncPattern.cs" />
+    <Compile Include="Bus\Internals\Serializer\DefaultSerializerTests.cs" />
+    <Compile Include="CanUseSagaStateMachineToCreateFSMGraph.cs" />
+    <Compile Include="Bus\Features\Hosting\CanHostBusInDifferentAppDomain.cs" />
+    <Compile Include="Bus\Features\SendPublish\CanPublishMessagesToConsumers.cs" />
+    <Compile Include="Messages\Reply\RemoteMessageReply.cs" />
+    <Compile Include="Messages\Request\RemoteMessage.cs" />
+    <Compile Include="Messages\AnotherTestMessage.cs" />
+    <Compile Include="Bus\Features\Configuration\MonacoConfigurationTests.cs" />
+    <Compile Include="Messages\FatTestMessage.cs" />
+    <None Include="Bus\Internals\Dispatcher\DispatcherTests.cs.exclude" />
+    <Compile Include="Bus\Internals\Serializer\DataContractSerializerTests.cs" />
+    <Compile Include="Bus\Internals\Serializer\SharpSerializerProviderTests.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="BusPerformanceTests.cs" />
+    <None Include="Bus\Features\Sagas\CanCorrelateMessagesToSaga.cs.exclude" />
+    <None Include="Bus\Features\Sagas\CanProcessMessagesToSaga.cs.exclude" />
+    <Compile Include="MyTestStateMachine.cs" />
+    <Compile Include="SagaStateMachineVisualizer.cs" />
+    <None Include="distributor.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="sample.sql.config">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="Saga\StateMachine\CanDispatchMessageToSagaStateMachine.cs.exclude" />
+    <Compile Include="Bus\Features\StateMachine\CanVerbalizeSagaStateMachine.cs" />
+    <None Include="Sandbox\sagas\tests\CanUnitTestSagaStateMachine.cs.exclude" />
+    <None Include="Sandbox\sagas\tests\SagaStateMachineTestFixure.cs.exclude" />
+    <None Include="Sandbox\sagas\tests\SagaUnitTestDispatcher.cs.exclude" />
+    <Compile Include="Sandbox\Pipeline\IPipeline.cs" />
+    <Compile Include="Sandbox\sagas\tests\SagaUnitTestEventTriggerCondition.cs" />
+    <None Include="Sandbox\scratchpad.cs.temp" />
+    <Compile Include="Messages\TestMessage.cs" />
+    <Compile Include="Bus\Features\Subscriptions\CanUseBusForInstanceSubscriptions.cs" />
+    <Compile Include="Bus\Features\StateMachine\TestStartMessage.cs" />
+    <Compile Include="Bus\Features\StateMachine\TestStartedMessage.cs" />
+    <Compile Include="Bus\Features\StateMachine\TestStateMachine.cs" />
+    <Compile Include="Utilities.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Extensibility\Containers\Monaco.Containers.Windsor\Monaco.Containers.Windsor.csproj">
+      <Project>{D6D40AB7-F120-443B-A4F6-0EFB505BDB5C}</Project>
+      <Name>Monaco.Containers.Windsor</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Extensibility\Testing\Monaco.Testing\Monaco.Testing.csproj">
+      <Project>{02595A00-246B-4CDB-8870-0D5AC08C1B85}</Project>
+      <Name>Monaco.Testing</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Extensibility\Transports\Monaco.Transports.Msmq\Monaco.Transports.Msmq.csproj">
+      <Project>{E9F16DED-89B4-4860-9116-91CF0B47C01C}</Project>
+      <Name>Monaco.Transports.Msmq</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Extensibility\WCF\Monaco.WCF\Monaco.WCF.csproj">
+      <Project>{1116F4B7-7B13-42D9-9676-8CC5CAAB9700}</Project>
+      <Name>Monaco.WCF</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Monaco\Monaco.csproj">
+      <Project>{2CAD4D0B-EB3D-4575-9809-3EB0BB0E23AC}</Project>
+      <Name>Monaco</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Bus\Features\ideas.txt" />
+    <EmbeddedResource Include="Bus\Features\StateMachine\Cases\can_verbalize_configured_statemachine.txt" />
+    <Content Include="log4net.config.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="monaco.config.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="sample.xml" />
+    <Content Include="Saga\StateMachine\ideas.txt" />
+    <Content Include="Bus\Features\WCF.Integration\ideas.txt" />
+    <Content Include="Bus\Features\Faults\ideas.txt" />
+    <Content Include="Sandbox\Pipeline\ideas.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="sample.virtual.config">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="remote.bus.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="saga.correlated.bus.config">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="saga.bus.config">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="sample.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="separate.app.domain.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1 Client Profile</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Windows.Installer.3.1">
+      <Visible>False</Visible>
+      <ProductName>Windows Installer 3.1</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Defects\" />
+    <Folder Include="Saga\Testing\" />
+    <Folder Include="Sandbox\AsyncPattern\" />
+    <Folder Include="Sandbox\Faults\" />
+    <Folder Include="Sandbox\Serialization\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

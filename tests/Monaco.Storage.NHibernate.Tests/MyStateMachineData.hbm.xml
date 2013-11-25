@@ -1,0 +1,20 @@
+﻿<hibernate-mapping xmlns="urn:nhibernate-mapping-2.2"
+                   assembly="Monaco.Storage.NHibernate.Tests"
+                   namespace="Monaco.Storage.NHibernate.Tests"
+                   default-lazy="false">
+
+	<!-- entity: MyStateMachineData -->
+	<class name="MyStateMachineData" table="MyStateMachineData">
+
+		<id name="Id" column="Id" type="System.Guid" >
+			<generator class="assigned" />
+		</id>
+
+     <!-- properties for entity 'MyStateMachineData' -->
+		<property name="State" column="state" type="String"  length="500" />
+		<property name="Version" column="version" type="System.Int32"  length="500" />
+    <property name="AccountNumber" column="accountNumber" type="String"  length="150" />
+        
+	</class>
+
+</hibernate-mapping>

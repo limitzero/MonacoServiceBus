@@ -1,0 +1,34 @@
+﻿Business process model for : AcmeBusinessProcessModel
+=====================================================
+Initially, for the capability of 'ShippingAnOrder' realized by 'Shipper'
+when the 'ShipmentReceived' message is received, the 'Shipper' will
+    execute the task(s) 'RequestShipping'
+    wait for the process(es) 'ProcessSchedule' to finish
+    which will produce the message 'ScheduledProcessed'
+          
+Next, for the capability of 'ShippingAnOrder' realized by 'Shipper'
+when the 'PriceCalculationFailed' message is received, the 'Shipper' will
+    execute the task(s) 'CancelShipment' and send the message 'ShipmentCancelled'
+then complete
+          
+          
+Initially, for the capability of 'Invoicing' realized by 'Invoicer'
+when the 'ShipmentReceived' message is received, the 'Invoicer' will
+    execute the task(s) 'InitiatePriceCalculation'
+    wait for the process(es) 'ProcessSchedule' to finish
+    which will produce the message 'ScheduledProcessed'
+    execute the task(s) 'CompletePriceCalculation'
+then complete
+          
+          
+Initially, for the capability of 'Scheduling' realized by 'Scheduler'
+when the 'ShipmentReceived' message is received, the 'Scheduler' will
+    execute the task(s) 'RequestProductionScheduling'
+    execute the task(s) 'HandleShippingPrice'
+    wait for the process(es) 'ProcessInvoice' to finish
+    which will produce the message 'InvoiceProcessed'
+          
+Next, for the capability of 'Scheduling' realized by 'Scheduler'
+when the 'PriceCalculationFailed' message is received, the 'Scheduler' will
+    execute the task(s) 'HaltProductionSchedule'
+then complete

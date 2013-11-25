@@ -1,0 +1,229 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using Monaco.Bus.Internals.Reflection;
+using Monaco.Configuration;
+using Monaco.Configuration.Profiles;
+using Monaco.Persistance.Repositories;
+
+using Xunit;
+
+namespace Monaco.Tests.Bus.Features.Sagas
+{
+    public class SagaEndpointConfig : BaseEndpointConfiguration, IClientProfile
+    {
+		public override void ConfigureEndpoint()
+        {
+        	MapMessages<SagaTests.LocalSaga>();
+        }
+    }
+
+    public class SagaTests : IDisposable
+    {
+        public static Guid _instanceId;
+        public static List<object> _received_messages;
+        public static ManualResetEvent _wait;
+        private MonacoContainer _container;
+
+        public SagaTests()
+        {
+            _container = new MonacoContainer(@"saga.bus.config");
+            _wait = new ManualResetEvent(false);
+            _received_messages = new List<object>();
+            _instanceId = Guid.Empty;
+        }
+
+        public void Dispose()
+        {
+			if(_container != null)
+			{
+				_container.Dispose();
+			}
+            _container = null;
+
+            if (_wait != null)
+            {
+                _wait.Close();
+                _wait = null;
+            }
+        }
+
+		[Fact]
+		public void can_publish_message_to_saga()
+		{
+			using (IServiceBus bus = _container.Resolve<IServiceBus>())
+			{
+				bus.ConfiguredWithEndpoint<SagaEndpointConfig>();
+
+				bus.Start();
+
+				bus.Publish(new LocalSagaMessage());
+
+				_wait.WaitOne(TimeSpan.FromSeconds(5));
+
+				Assert.True(IsMessageReceived<LocalSagaMessage>());
+			}
+		}
+
+    	[Fact]
+        public void can_dispatch_message_to_start_saga_and_have_data_be_correlated_to_the_saga_instance()
+        {
+            using (IServiceBus bus = _container.Resolve<IServiceBus>())
+            {
+				bus.ConfiguredWithEndpoint<SagaEndpointConfig>();
+
+                bus.Start();
+
+                bus.Publish(new LocalSagaMessage());
+
+                _wait.WaitOne(TimeSpan.FromSeconds(5));
+
+                Assert.NotEqual(Guid.Empty, _instanceId);
+
+                // saving of the data on the saga may not be complete yet:
+                System.Threading.Thread.Sleep(TimeSpan.FromSeconds(15));
+                var data = FindSagaData<LocalSagaData>(_instanceId);
+
+                Assert.True(IsMessageReceived<LocalSagaMessage>());
+
+                Assert.NotNull(data);
+
+                Assert.Equal(_instanceId, data.CorrelationId);
+            }
+        }
+
+
+        [Fact]
+        public void can_send_message_to_already_started_saga_and_have_the_saga_data_be_correlated_to_the_saga_instance()
+        {
+            using (IServiceBus bus = _container.Resolve<IServiceBus>())
+            {
+				bus.ConfiguredWithEndpoint<SagaEndpointConfig>();
+
+                bus.Start();
+
+                // start the saga:
+                bus.Publish(new LocalSagaMessage());
+
+                _wait.WaitOne(TimeSpan.FromSeconds(5));
+                _wait.Reset();
+
+                Assert.NotEqual(Guid.Empty, _instanceId);
+                Assert.True(IsMessageReceived<LocalSagaMessage>());
+
+                // send a new message into the saga that was started:
+                bus.Publish(new LocalSagaMessage2());
+                _wait.WaitOne(TimeSpan.FromSeconds(5));
+                _wait.Reset();
+
+                // retreive the data from the saga and check for correlation to active instance:
+                var data = FindSagaData<LocalSagaData>(_instanceId);
+
+                Assert.NotNull(data);
+                Assert.Equal(_instanceId, data.CorrelationId);
+
+                Assert.True(IsMessageReceived<LocalSagaMessage2>());
+            }
+        }
+
+        [Fact]
+        public void can_send_message_to_already_started_saga_and_send_another_message_to_complete_and_remove_instance()
+        {
+            using (IServiceBus bus = _container.Resolve<IServiceBus>())
+            {
+				bus.ConfiguredWithEndpoint<SagaEndpointConfig>();
+
+                bus.Start();
+
+                bus.Publish(new LocalSagaMessage());
+
+                _wait.WaitOne(TimeSpan.FromSeconds(5));
+                _wait.Reset();
+
+                Assert.NotEqual(Guid.Empty, _instanceId);
+                Assert.True(IsMessageReceived<LocalSagaMessage>());
+
+                bus.Publish(new LocalSagaMessage3());
+                _wait.WaitOne(TimeSpan.FromSeconds(10));
+                _wait.Set();
+
+                Assert.True(IsMessageReceived<LocalSagaMessage3>());
+
+                // saving of the data on the saga may not be complete yet:
+                System.Threading.Thread.Sleep(TimeSpan.FromSeconds(15));
+
+                ISagaRepository repository = _container.Resolve<ISagaRepository>();
+                //ISaga theSaga = repository.Find(_instanceId);
+                //Assert.Null(theSaga);
+            }
+        }
+
+        private TSAGADATA FindSagaData<TSAGADATA>(Guid instanceId) where TSAGADATA : class, ISagaData
+        {
+            Type type = typeof (ISagaDataRepository<>).MakeGenericType(typeof (TSAGADATA));
+            var repository = _container.Resolve(type);
+
+            IReflection reflection = _container.Resolve<IReflection>();
+            var theData = reflection.InvokeFindForSagaDataRepository(repository, instanceId);
+
+            return theData as TSAGADATA;
+        }
+
+        private static bool IsMessageReceived<TMESSAGE>()
+        {
+            return _received_messages.Exists(x => x.GetType() == typeof (TMESSAGE));
+        }
+
+        public class LocalSaga :
+            Saga<LocalSagaData>,
+            StartedBy<LocalSagaMessage>,
+            OrchestratedBy<LocalSagaMessage2>,
+            OrchestratedBy<LocalSagaMessage3>
+        {
+  
+            public void Consume(LocalSagaMessage2 message)
+            {
+                _received_messages.Add(message);
+                _wait.Set();
+            }
+
+            public void Consume(LocalSagaMessage3 message)
+            {
+                _received_messages.Add(message);
+                IsCompleted = true;
+                //_wait.Set();
+            }
+
+            public void Consume(LocalSagaMessage message)
+            {
+                _instanceId = InstanceId;
+                _received_messages.Add(message);
+                _wait.Set();
+            }
+
+        }
+
+        public class LocalSagaData : ISagaData
+        {
+			public virtual Guid CorrelationId { get; set; }
+			public string State { get; set; }
+        }
+
+      
+        public class LocalSagaMessage : IMessage
+        {
+			public Guid CorrelationId { get; set; }
+        }
+
+        public class LocalSagaMessage2 : IMessage
+        {
+			public Guid CorrelationId { get; set; }
+        }
+
+        public class LocalSagaMessage3 : IMessage
+        {
+			public Guid CorrelationId { get; set; }
+        }
+
+    }
+}

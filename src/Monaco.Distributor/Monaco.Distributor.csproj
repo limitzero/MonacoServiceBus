@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{62AF5D81-19A8-4E1F-A09E-0B3C4025A121}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Monaco.Distributor</RootNamespace>
+    <AssemblyName>Monaco.Distributor</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Castle.Core">
+      <HintPath>..\..\lib\Castle.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.MicroKernel">
+      <HintPath>..\..\lib\Castle.MicroKernel.dll</HintPath>
+    </Reference>
+    <Reference Include="Castle.Windsor">
+      <HintPath>..\..\lib\Castle.Windsor.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="ConfigurationExtensions.cs" />
+    <Compile Include="IDistributor.cs" />
+    <Compile Include="Configuration\Elements\WorkerPoolElementBuilder.cs" />
+    <Compile Include="Configuration\MonacoDistributorConfiguration.cs" />
+    <Compile Include="Configuration\MonacoDistributorFacility.cs" />
+    <Compile Include="Internals\Distributor.cs" />
+    <Compile Include="Internals\Fabric\FabricWorkerSelector.cs" />
+    <Compile Include="Internals\Fabric\Impl\FabricWorkerPoolConfigurationRepository.cs" />
+    <Compile Include="Internals\Fabric\IFabricWorkerConfiguration.cs" />
+    <Compile Include="Internals\Fabric\IFabricWorkerPool.cs" />
+    <Compile Include="Internals\Fabric\IFabricWorkerPoolConfiguration.cs" />
+    <Compile Include="Internals\Fabric\Impl\FabricWorker.cs" />
+    <Compile Include="Internals\Fabric\Impl\FabricWorkerConfiguration.cs" />
+    <Compile Include="Internals\Fabric\Impl\FabricWorkerPool.cs" />
+    <Compile Include="Internals\Fabric\Impl\FabricWorkerPoolConfiguration.cs" />
+    <Compile Include="Internals\Fabric\Policies\FindNextWorkerBySmallestWeightPolicy.cs" />
+    <Compile Include="Internals\Fabric\Policies\IWorkerSelectionPolicy.cs" />
+    <Compile Include="Internals\IRecyclable.cs" />
+    <Compile Include="Internals\Fabric\IFabricWorkerPoolConfigurationRepository.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Configuration\distributor.configuration.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Monaco\Monaco.csproj">
+      <Project>{2CAD4D0B-EB3D-4575-9809-3EB0BB0E23AC}</Project>
+      <Name>Monaco</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

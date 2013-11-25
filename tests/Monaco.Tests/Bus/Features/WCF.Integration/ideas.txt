@@ -1,0 +1,49 @@
+﻿Would like to link in the asynchronous pattern for integrating web services and other things to the service bus
+
+Ex:
+
+IAsyncResult BeginXXXX({messages}, AsyncCallback callback, object state); 
+void EndXXX(IAsyncResult result);
+
+Ideas:
+1. Gateways for doing async behavior over exposed web service
+
+Ex: 
+
+[ServiceBehavior(ConcurrencyMode = ConcurrencyMode.Single)]
+public class MyService
+{
+	private IServiceAsyncRequest _request; 
+	private readonly IServiceBus _bus; 
+
+	public MyService(IServiceBus bus)
+	{
+		_bus = bus;
+	}
+
+	public IAsyncResult BeginGetAllProducts(RetrieveProductsQuery message,  AsyncCallback callback, object state)
+	{
+		_request = _bus.EnqueueRequest().WithCallback(callback, state);	
+		_request.Send(message);
+		return _request;
+	}
+
+	public AllProductsResponse EndGetAllProducts(IAsyncResult asyncResult)
+	{
+	    _request.Complete();
+
+		var products = _request.GetReply<AllProducts>(); 
+
+		return products;
+	}
+}
+
+public class ProductsConsumer
+	:Consumes<RetrieveProductsQuery>
+{
+	public void Consume(RetrieveProductsQuery message)
+	{
+		// go to the database and get all of the products...
+		Reply(new AllProductsResponse());
+	}
+}

@@ -1,0 +1,229 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Monaco.Bus.Events;
+using Monaco.Bus.Messages.For.Control;
+using Monaco.Bus.Messages.For.Endpoints;
+using Monaco.Extensions;
+using Monaco.Infrastructure.Logging;
+using Monaco.Services.HealthMonitoring;
+using Monaco.Services.HealthMonitoring.Messages;
+using Monaco.Services.HealthMonitoring.Messages.Commands;
+using Monaco.Services.HealthMonitoring.Messages.Events;
+
+namespace Monaco.Endpoint.Management.Health
+{
+	/// <summary>
+	/// State machine to record the health and other statistics for local bus instance.
+	/// </summary>
+	public class EndpointHealthMessageConsumer :
+	    MessageConsumer<HealthMonitoringData>,
+		Consumes<ServiceBusStarted>,
+		Consumes<ServiceBusStopped>,
+		Consumes<EndpointMessageSent>,
+		Consumes<EndpointMessageReceived>,
+		Consumes<EndpointHeartBeat>,
+		Consumes<RecycleStatisticsMessage>,
+		Consumes<BroadcastStatusForEndpointMessage>,
+		Consumes<EndpointsStatusInquiryMessage>
+	{
+		public void Consume(ServiceBusStarted message)
+		{
+			var control = Bus.GetControlEndpoint();
+			if (control == null) return;
+			control.Receive(this.Bus, message);
+		}
+
+		public void Consume(ServiceBusStopped message)
+		{
+			this.Data = null;
+			var control = Bus.GetControlEndpoint();
+			if (control == null) return;
+			control.Receive(this.Bus, message);
+		}
+
+		public void Consume(EndpointsStatusInquiryMessage message)
+		{
+			List<HealthMonitoringStatistic> statistics = new List<HealthMonitoringStatistic>();
+
+			foreach (HealthMonitoringStatistic statistic in this.Data.Statistics)
+			{
+				ICollection<HealthMonitoringStatistic> endpointStats = this.GetStatisticsForEndpoint(message.EndpointUri);
+				HealthMonitoringStatistic endpointStatistic =
+					this.ComputeStatistics(message.EndpointUri, endpointStats);
+
+				if (!statistics.Exists(x => x.EndpointUri == endpointStatistic.EndpointUri))
+				{
+					statistics.Add(endpointStatistic);
+				}
+			}
+
+			// send the listing of statistics back to the requestor:
+			EndpointStatusResultMessage result =
+				new EndpointStatusResultMessage() { Statistics = statistics.Distinct().ToList() };
+
+			Bus.Send(message.Originator.ToUri(), result);
+		}
+
+		public void Consume(BroadcastStatusForEndpointMessage message)
+		{
+			var status = new EndpointStatusResultMessage();
+			status.AddStatistics(Data.Statistics.ToArray());
+
+			var controlEndpoint = Bus.GetControlEndpoint();
+			if (controlEndpoint == null) return;
+
+			controlEndpoint.Receive(this.Bus, status);
+		}
+
+		public void Consume(RecycleStatisticsMessage message)
+		{
+			ILogger logger = Bus.Find<ILogger>();
+			logger.LogInfoMessage("Recycling all endpoint statistics...");
+			this.Data = new HealthMonitoringData();
+		}
+
+		public void Consume(EndpointHeartBeat message)
+		{
+			Bus.Find<ILogger>().LogInfoMessage(string.Format("Heartbeat received from '{0}'.", message.EndpointUri));
+			HealthMonitoringStatistic statistic = new HealthMonitoringStatistic(message.EndpointUri);
+
+			message.Received = DateTime.Now;
+
+			statistic.RecordHeartBeat(message);
+			Data.RegisterStatistic(statistic);
+		}
+
+		public void Consume(EndpointMessageReceived message)
+		{
+			Bus.Find<ILogger>().LogInfoMessage(string.Format("Message '{0}' received from endpoint '{1}'.",
+												   message.Message.GetType().FullName,
+												   message.EndpointUri));
+
+			HealthMonitoringStatistic statistic = new HealthMonitoringStatistic(message.EndpointUri);
+			statistic.RecordMessageReceived();
+			Data.RegisterStatistic(statistic);
+		}
+
+		public void Consume(EndpointMessageSent message)
+		{
+			Bus.Find<ILogger>().LogInfoMessage(string.Format("Message '{0}' delivered to endpoint '{1}'.",
+												   message.Message.GetType().Name,
+												   message.EndpointUri));
+
+			HealthMonitoringStatistic statistic = new HealthMonitoringStatistic(message.EndpointUri);
+			statistic.RecordMessageSent();
+			Data.RegisterStatistic(statistic);
+		}
+
+		public override void Define()
+		{
+
+			//UponReceiving<EndpointMessageReceived>( message =>
+			//{
+			//    Bus.Find<ILogger>().LogInfoMessage(string.Format("Message '{0}' received from endpoint '{1}'.",
+			//                                   message.Message.GetType().FullName,
+			//                                   message.EndpointUri));
+
+			//    EndpointStatistic statistic = new EndpointStatistic(message.EndpointUri);
+			//    statistic.RecordMessageReceived();
+			//    Data.RegisterStatistic(statistic);
+			//});
+
+			//UponReceiving<EndpointMessageSent>(message =>
+			//                                    {
+			//                                        Bus.Find<ILogger>().LogInfoMessage(string.Format("Message '{0}' sent from endpoint '{1}'.",
+			//                                       message.Message.GetType().FullName,
+			//                                       message.EndpointUri));
+
+			//                                        EndpointStatistic statistic = new EndpointStatistic(message.EndpointUri);
+			//                                        statistic.RecordMessageSent();
+			//                                        Data.RegisterStatistic(statistic);
+			//                                    });
+
+			//UponReceiving<EndpointHeartBeatMessage>(message =>
+			//                                            {
+			//                                                Bus.Find<ILogger>().LogInfoMessage(string.Format("Heartbeat received from '{0}'.", message.EndpointUri));
+			//                                                EndpointStatistic statistic = new EndpointStatistic(message.EndpointUri);
+
+			//                                                message.Received = DateTime.Now;
+
+			//                                                statistic.RecordHeartBeat(message);
+			//                                                Data.RegisterStatistic(statistic);
+			//                                            });
+
+
+			//UponReceiving<BroadcastStatusForEndpointMessage>(message =>
+			//                                                    {
+			//                                                        var status = new EndpointStatusResultMessage();
+			//                                                        status.AddStatistics(Data.Statistics.ToArray());
+
+			//                                                        var controlEndpoint = Bus.GetControlEndpoint();
+			//                                                        if (controlEndpoint == null) return;
+
+			//                                                        controlEndpoint.Receive(this.Bus, status);
+			//                                                    });
+
+			//UponReceiving<EndpointsStatusInquiryMessage>(message =>
+			//                                                {
+			//                                                    List<EndpointStatistic> statistics = new List<EndpointStatistic>();
+
+			//                                                    foreach (EndpointStatistic statistic in this.Data.Statistics)
+			//                                                    {
+			//                                                        ICollection<EndpointStatistic> endpointStats = this.GetStatisticsForEndpoint(message.EndpointUri);
+			//                                                        EndpointStatistic endpointStatistic =
+			//                                                            this.ComputeStatistics(message.EndpointUri, endpointStats);
+
+			//                                                        if (!statistics.Exists(x => x.EndpointUri == endpointStatistic.EndpointUri))
+			//                                                        {
+			//                                                            statistics.Add(endpointStatistic);
+			//                                                        }
+			//                                                    }
+
+			//                                                    // send the listing of statistics back to the requestor:
+			//                                                    EndpointStatusResultMessage result =
+			//                                                        new EndpointStatusResultMessage() { Statistics = statistics.Distinct().ToList() };
+
+			//                                                    Bus.Send(message.Originator.ToUri(), result);
+			//                                                });
+
+
+			//UponReceiving<EndpointHealthRecycleStatisticsMessage>(message =>
+			//                                                        {
+			//                                                            ILogger logger = Bus.Find<ILogger>();
+
+			//                                                            logger.LogInfoMessage("Recycling all local endpoint statistics for " + Bus.Transport.EndpointUri);
+
+			//                                                            this.Data = new EndpointHealthSagaState() { CorrelationId = this.Data.CorrelationId };
+			//                                                        });
+		}
+
+		private ICollection<HealthMonitoringStatistic> GetStatisticsForEndpoint(string endpointUri)
+		{
+			ICollection<HealthMonitoringStatistic> statistics = (from theStatistic in this.Data.Statistics
+														 where
+															 theStatistic.EndpointUri.Trim().ToLower() ==
+															 endpointUri.Trim().ToLower()
+														 select theStatistic).Distinct().ToList();
+			return statistics;
+		}
+
+		private HealthMonitoringStatistic ComputeStatistics(string endpointUri,
+													IEnumerable<HealthMonitoringStatistic> statistics)
+		{
+			HealthMonitoringStatistic endpointStatistic = new HealthMonitoringStatistic(endpointUri);
+
+			foreach (var statistic in statistics)
+			{
+				endpointStatistic.NumberOfMessagesReceived += statistic.NumberOfMessagesReceived;
+				endpointStatistic.NumberOfMessagesSent += statistic.NumberOfMessagesSent;
+				endpointStatistic.Heartbeats.AddRange(statistic.Heartbeats);
+			}
+
+			endpointStatistic.SetHeartBeatStatus();
+
+			return endpointStatistic;
+		}
+
+	}
+}

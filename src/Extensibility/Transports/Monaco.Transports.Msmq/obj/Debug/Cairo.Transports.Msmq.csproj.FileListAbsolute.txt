@@ -1,0 +1,11 @@
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\bin\Debug\Cairo.Transports.Msmq.dll
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\bin\Debug\Cairo.Transports.Msmq.pdb
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\bin\Debug\Cairo.ESB.dll
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\bin\Debug\Castle.Core.dll
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\bin\Debug\Castle.MicroKernel.dll
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\bin\Debug\log4net.dll
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\bin\Debug\Rhino.Mocks.dll
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\bin\Debug\Cairo.ESB.pdb
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\obj\Debug\ResolveAssemblyReference.cache
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\obj\Debug\Cairo.Transports.Msmq.dll
+C:\repositories\Cairo.ESB\src\Cairo.Transports.Msmq\obj\Debug\Cairo.Transports.Msmq.pdb

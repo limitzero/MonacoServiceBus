@@ -1,0 +1,27 @@
+﻿MONACO.HOST.EXE - Host for components on Monaco Service Bus
+ 
+ Usage:
+ 
+ MONACO.HOST.EXE	[/?] [/help] [/debug] [/install /service {name} /description {service description}]  [/uninstall /service {name}] 
+									
+
+ /?                       - shows this usage
+ /debug               - runs the host in interactive mode
+ /install               - installs the host as a windows service
+ /uninstall           - un-installs the host as a windows service
+ /service              - (optional) name of that will appear in the Windows Service Control Panel applet for the service.
+ /description       - (optional) description of that will appear in the Windows Service Control Panel applet for the service.
+
+ Ex: Basic Usage for interactive testing
+ monaco.host.exe /debug  or monaco.host.exe (default setting for use in IDE for starting process for library components)
+
+ Ex: Usage for installing the host as a service
+ monaco.host.exe /install    (short version: uses the assembly with endpoint configuration as service name and description)
+ monaco.host.exe /install /service "My Service" /description "My Service Description"
+ 
+
+ Ex: Usage for un-installing the host as a service
+ monaco.host.exe /uninstall
+ monaco.host.exe /uninstall /service "My Service"
+
+ Press any key to exit the "Help":

@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<!-- add the section below inside of the 'message.bus' element to configure NHibernate storage -->
+<nhibernate.storage>
+	<!-- maps to 'connection.provider' for nhibernate configuration -->
+	<connection.provider></connection.provider>
+
+	<!-- maps to 'connection.driver_class' for nhibernate configuration -->
+	<connection.provider.driver></connection.provider.driver>
+
+	<!-- maps to 'connection.connection_string' for nhibernate configuration-->
+	<connection.connection.string></connection.connection.string>
+	
+	<!-- maps to 'show.sql' for nhibernate configuration -->
+	<connection.show.sql></connection.show.sql>
+
+	<!-- maps to 'dialect' for nhibernate configuration -->
+	<connection.dialect></connection.dialect>
+
+	<!-- maps to 'use_outer_join' for nhibernate configuration -->
+	<connection.use.outer.join></connection.use.outer.join>
+
+	<!-- maps to 'command_timeout' for nhibernate configuration -->
+	<connection.command.timeout></connection.command.timeout>
+
+	<!-- maps to 'query.substitutions' for nhibernate configuration -->
+	<connection.query.substitutions></connection.query.substitutions>
+
+	<!-- maps to 'proxyfactory.factory_class' for nhibernate configuration -->
+	<connection.proxy.factory></connection.proxy.factory>
+
+	<!-- maps to 'mapping assembly={}' for nhibernate configuration -->
+	<connection.mapping.assembly></connection.mapping.assembly>
+
+</nhibernate.storage>
